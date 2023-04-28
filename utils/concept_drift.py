@@ -1,7 +1,65 @@
 from river import datasets
 from river.datasets import synth
+from typing import Dict
 import random
 import math
+
+
+class IncrementalConceptDrift(datasets.base.SyntheticDataset):
+    def __init__(
+        self,
+        initialStream: datasets.base.SyntheticDataset,
+        nextStream: datasets.base.SyntheticDataset,
+        width: int,
+        startingPosition: int,
+    ):
+        self.initialStream = initialStream
+        self.nextStream = nextStream
+        self.width = width
+        self.startingPosition = startingPosition
+        self.instanceCount = 0
+        super().__init__(
+            self.initialStream.task,
+            self.initialStream.n_features,
+            self.initialStream.n_samples,
+            self.initialStream.n_classes,
+            self.initialStream.n_outputs,
+        )
+
+        self.initialStreamIterator = iter(self.initialStream)
+        self.nextStreamIterator = iter(self.nextStream)
+
+    def __interpolate(self, instance1: Dict, instance2: Dict, driftProbabilty: float):
+        # Only interpolates numbers, add ifs to interpolate nominal attributes
+        for key in instance1.keys():
+            value1 = instance1.get(key)
+            value2 = instance2.get(key)
+            interpolate = (1 - driftProbabilty) * value1 + driftProbabilty * value2
+            instance1[key] = interpolate
+        return instance1
+
+    def __iter__(self):
+        while True:
+            self.instanceCount += 1
+            x = -4.0 * (self.instanceCount - self.position) / self.width
+            try:
+                driftProbability = 1.0 / (1.0 + math.exp(x))
+            except:
+                driftProbability = 0
+
+            try:
+                primaryStreamNextElement = next(self.initialStreamIterator)
+                driftStreamNextElement = next(self.initialStreamIterator)
+                while driftStreamNextElement[1] != primaryStreamNextElement[1]:
+                    driftStreamNextElement = next(self.initialStreamIterator)
+
+                x, y = primaryStreamNextElement
+                newX = self.__interpolate(x, driftStreamNextElement[0])
+                nextElement = (newX, y)
+
+            except StopIteration:
+                break
+            yield nextElement
 
 
 class ConceptDriftStream(datasets.base.SyntheticDataset):
@@ -12,7 +70,6 @@ class ConceptDriftStream(datasets.base.SyntheticDataset):
         width: int,
         position: int,
         angle: float,
-        stream_size: int = 100000,
     ):
         self.initialStream = initialStream
         self.nextStream = nextStream
@@ -20,7 +77,6 @@ class ConceptDriftStream(datasets.base.SyntheticDataset):
         self.position = position
         self.angle = angle
         self.instanceCount = 0
-        self.stream_size = stream_size
         super().__init__(
             self.initialStream.task,
             self.initialStream.n_features,
@@ -65,10 +121,3 @@ if __name__ == "__main__":
 
     for x, y in slicer:
         print(x, y)
-    # print(x)
-
-    # stream_iter = iter(stream1)
-
-    # print(next(stream_iter))
-    # print(next(stream_iter))
-    # print(next(stream_iter))

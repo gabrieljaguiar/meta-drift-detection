@@ -1,6 +1,7 @@
 import random
 import math
 import river
+from river.datasets import synth
 from typing import Dict
 
 
@@ -14,8 +15,9 @@ class Evaluator:
         self.columnKappa = [0.0] * self.numberOfClasses
         self.cm = [[0.0] * self.numberOfClasses] * self.numberOfClasses
 
-    def addResult(self, instance: Dict[float, int], classVotes: list):
+    def addResult(self, instance: Dict[float, int], probabilties: Dict):
         _, y = instance
+        classVotes = [probabilties.get(i, 0) for i in range(self.numberOfClasses)]
         prediction = classVotes.index(max(classVotes))
         self.predictions[self.totalObservedInstances % self.windowSize] = (
             1 if prediction == y else 0
@@ -34,56 +36,32 @@ class Evaluator:
 
 
 if __name__ == "__main__":
-    windowsize = 4
+    from river.tree import HoeffdingTreeClassifier
+    import concept_drift
+
+    windowsize = 500
     evaluator = Evaluator(windowSize=windowsize)
 
-    instances = [
-        (1.0, 1),
-        (1.0, 0),
-        (1.0, 1),
-        (1.0, 1),
-        (1.0, 0),
-        (1.0, 0),
-        (1.0, 1),
-        (1.0, 0),
-        (1.0, 1),
-        (1.0, 1),
-        (1.0, 0),
-        (1.0, 0),
-        (1.0, 1),
-        (1.0, 1),
-        (1.0, 0),
-        (1.0, 1),
-        (1.0, 1),
-        (1.0, 0),
-        (1.0, 0),
-        (1.0, 1),
-    ]
+    stream1 = synth.Agrawal(classification_function=0, seed=42)
+    stream2 = synth.Agrawal(classification_function=8, seed=42)
 
-    predictions = [
-        (0.2, 0.8),  # 0
-        (0.9, 0.1),  # 1
-        (0.2, 0.8),  # 0
-        (0.4, 0.6),  # 1
-        (0.2, 0.8),  # 1
-        (0.3, 0.7),  # 1
-        (0.6, 0.4),  # 0
-        (0.9, 0.1),  # 0
-        (0.6, 0.4),  # 0
-        (0.2, 0.8),  # 1
-        (0.1, 0.9),  # 1
-        (0.6, 0.4),  # 0
-        (0.3, 0.7),  # 1
-        (0.4, 0.6),  # 1
-        (0.9, 0.1),  # 0
-        (0.8, 0.2),  # 0
-        (0.7, 0.3),  # 1
-        (0.4, 0.6),  # 1
-        (0.2, 0.8),  # 1
-        (0.6, 0.4),  # 0
-    ]
+    conceptDriftStream = concept_drift.ConceptDriftStream(
+        stream1, stream2, width=1, position=4000, angle=0
+    )
 
-    for i, instance, prediction in zip(range(len(instances)), instances, predictions):
-        evaluator.addResult(instance, prediction)
-        if (i + 1) % windowsize == 0:
-            print(evaluator.getAccuracy())
+    model = HoeffdingTreeClassifier(
+        grace_period=100, delta=1e-5, nominal_attributes=["elevel", "car", "zipcode"]
+    )
+
+    idx = 0
+
+    for x, y in conceptDriftStream.take(200):
+        model.learn_one(x, y)
+
+    for x, y in conceptDriftStream.take(6000):
+        idx += 1
+        y_hat = model.predict_proba_one(x)
+        evaluator.addResult((x, y), y_hat)
+        model.learn_one(x, y)
+        if idx % windowsize == 0:
+            print("Accuracy {}: {}%".format(idx, evaluator.getAccuracy()))
