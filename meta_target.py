@@ -43,6 +43,12 @@ sudden_drifts = [
 ]
 
 
+# How to evaluate
+# Drift was detected after a real drift? If yes, how many instances after.
+# Delay between drift happening and detection.
+# Drift detection when there was no drift (False Alarms).
+
+
 stream_sizes = 20000
 window_size = 500
 idx = 0
@@ -51,9 +57,9 @@ for g in sudden_drifts:
     print("generator {}".format(g.__str__()))
     streamEvaluator = evaluator.Evaluator(windowSize=window_size)
     model = HoeffdingAdaptiveTreeClassifier()
-    # drift_detector = adwin.ADWIN(delta=0.0001, grace_period=1000)
-    drift_detector = binary.HDDM_A()
+    drift_detector = adwin.ADWIN()
     idx = 0
+    detected_drifts = []
 
     for x, y in g.take(stream_sizes):
         y_hat = model.predict_proba_one(x)
@@ -65,9 +71,6 @@ for g in sudden_drifts:
         model.learn_one(x, y)
 
         if drift_detector.drift_detected:
-            print("Drift Detected at {}".format(idx))
+            detected_drifts.append({"idx": idx})
 
         idx += 1
-
-        # if idx % window_size == 0:
-        #    print("Accuracy {}: {}%".format(idx, streamEvaluator.getAccuracy()))
