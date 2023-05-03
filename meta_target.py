@@ -4,38 +4,36 @@ from river.datasets import synth
 from river.drift import adwin, binary
 from river.tree import HoeffdingAdaptiveTreeClassifier
 
+import pandas as pd
+
 sudden_drifts = [
     concept_drift.ConceptDriftStream(
         synth.Agrawal(classification_function=0, seed=42),
-        synth.Agrawal(classification_function=8, seed=42),
-        width=1,
-        position=10000,
-        angle=0,
-    ),
-    concept_drift.ConceptDriftStream(
-        synth.Agrawal(classification_function=2, seed=42),
-        synth.Agrawal(classification_function=4, seed=42),
-        width=1,
-        position=10000,
-        angle=0,
-    ),
-    concept_drift.ConceptDriftStream(
-        synth.Agrawal(classification_function=7, seed=42),
-        synth.Agrawal(classification_function=2, seed=42),
-        width=1,
-        position=10000,
-        angle=0,
-    ),
-    concept_drift.ConceptDriftStream(
-        synth.Agrawal(classification_function=6, seed=42),
-        synth.Agrawal(classification_function=1, seed=42),
-        width=1,
-        position=10000,
-        angle=0,
-    ),
-    concept_drift.ConceptDriftStream(
-        synth.Agrawal(classification_function=2, seed=42),
-        synth.Agrawal(classification_function=5, seed=42),
+        concept_drift.ConceptDriftStream(
+            synth.Agrawal(classification_function=1, seed=42),
+            concept_drift.ConceptDriftStream(
+                synth.Agrawal(classification_function=2, seed=42),
+                concept_drift.ConceptDriftStream(
+                    synth.Agrawal(classification_function=3, seed=42),
+                    concept_drift.ConceptDriftStream(
+                        synth.Agrawal(classification_function=4, seed=42),
+                        synth.Agrawal(classification_function=5, seed=42),
+                        width=1,
+                        position=10000,
+                        angle=0,
+                    ),
+                    width=1,
+                    position=10000,
+                    angle=0,
+                ),
+                width=1,
+                position=10000,
+                angle=0,
+            ),
+            width=1,
+            position=10000,
+            angle=0,
+        ),
         width=1,
         position=10000,
         angle=0,
@@ -49,9 +47,11 @@ sudden_drifts = [
 # Drift detection when there was no drift (False Alarms).
 
 
-stream_sizes = 20000
+stream_sizes = 60000
 window_size = 500
 idx = 0
+detected_drifts = []
+gen_idx = 0
 
 for g in sudden_drifts:
     print("generator {}".format(g.__str__()))
@@ -59,7 +59,6 @@ for g in sudden_drifts:
     model = HoeffdingAdaptiveTreeClassifier()
     drift_detector = adwin.ADWIN()
     idx = 0
-    detected_drifts = []
 
     for x, y in g.take(stream_sizes):
         y_hat = model.predict_proba_one(x)
@@ -70,7 +69,16 @@ for g in sudden_drifts:
         streamEvaluator.addResult((x, y), y_hat)
         model.learn_one(x, y)
 
+        if (idx + 1) % window_size == 0:
+            print("Accuracy at {}: {}%".format(idx, streamEvaluator.getAccuracy()))
+
         if drift_detector.drift_detected:
-            detected_drifts.append({"idx": idx})
+            detected_drifts.append({"g": gen_idx, "idx": idx})
 
         idx += 1
+
+    gen_idx += 1
+
+
+df = pd.DataFrame(detected_drifts)
+df.to_csv("meta_target.csv", index=False)
