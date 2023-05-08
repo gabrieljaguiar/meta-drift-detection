@@ -3,42 +3,8 @@ from utils import evaluator
 from river.datasets import synth
 from river.drift import adwin, binary
 from river.tree import HoeffdingAdaptiveTreeClassifier
-
+from experimental_drifts import drifting_streams
 import pandas as pd
-
-sudden_drifts = [
-    concept_drift.ConceptDriftStream(
-        synth.Agrawal(classification_function=0, seed=42),
-        concept_drift.ConceptDriftStream(
-            synth.Agrawal(classification_function=1, seed=42),
-            concept_drift.ConceptDriftStream(
-                synth.Agrawal(classification_function=2, seed=42),
-                concept_drift.ConceptDriftStream(
-                    synth.Agrawal(classification_function=3, seed=42),
-                    concept_drift.ConceptDriftStream(
-                        synth.Agrawal(classification_function=4, seed=42),
-                        synth.Agrawal(classification_function=5, seed=42),
-                        width=1,
-                        position=10000,
-                        angle=0,
-                    ),
-                    width=1,
-                    position=10000,
-                    angle=0,
-                ),
-                width=1,
-                position=10000,
-                angle=0,
-            ),
-            width=1,
-            position=10000,
-            angle=0,
-        ),
-        width=1,
-        position=10000,
-        angle=0,
-    ),
-]
 
 
 # How to evaluate
@@ -47,13 +13,13 @@ sudden_drifts = [
 # Drift detection when there was no drift (False Alarms).
 
 
-stream_sizes = 60000
+stream_sizes = 100000
 window_size = 500
 idx = 0
 detected_drifts = []
 gen_idx = 0
 
-for g in sudden_drifts:
+for g in drifting_streams:
     print("generator {}".format(g.__str__()))
     streamEvaluator = evaluator.Evaluator(windowSize=window_size)
     model = HoeffdingAdaptiveTreeClassifier()
