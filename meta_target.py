@@ -12,6 +12,13 @@ import pandas as pd
 # Delay between drift happening and detection.
 # Drift detection when there was no drift (False Alarms).
 
+# What chunk of data are we gonna use? Sliding window in a big stream with multiple drifts
+# One "small" data stream with only one drift in multiple positions
+# We cannot use a big stream as one meta-instance does not "look real"
+
+# How we are going to adapt the concept drift on the fly? Each X instances we check features?
+# Every detected drift we check features?
+
 
 stream_sizes = 100000
 window_size = 500
