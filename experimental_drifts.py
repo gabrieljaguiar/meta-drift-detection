@@ -1,6 +1,19 @@
 from river.datasets import synth
 from utils import concept_drift
 
+
+agrawal_sudden_drifts = [
+    concept_drift.ConceptDriftStream(
+        synth.Agrawal(classification_function=i, seed=42),
+        synth.Agrawal(classification_function=(i + 1), seed=42),
+        width=1,
+        position=1000,
+        size=10000,
+    )
+    for i in range(0, 8)
+]
+
+
 sudden_drifts = [
     concept_drift.ConceptDriftStream(
         synth.Agrawal(classification_function=0, seed=42),

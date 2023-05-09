@@ -69,7 +69,8 @@ class ConceptDriftStream(datasets.base.SyntheticDataset):
         nextStream: datasets.base.SyntheticDataset,
         width: int,
         position: int,
-        angle: float,
+        size: int,
+        angle: float = 0,
     ):
         self.initialStream = initialStream
         self.nextStream = nextStream
@@ -77,6 +78,7 @@ class ConceptDriftStream(datasets.base.SyntheticDataset):
         self.position = position
         self.angle = angle
         self.instanceCount = 0
+        self.size = size
         super().__init__(
             self.initialStream.task,
             self.initialStream.n_features,
@@ -91,6 +93,9 @@ class ConceptDriftStream(datasets.base.SyntheticDataset):
     def __iter__(self):
         while True:
             self.instanceCount += 1
+            if self.instanceCount == self.size:
+                break
+
             x = -4.0 * (self.instanceCount - self.position) / self.width
             try:
                 driftProbability = 1.0 / (1.0 + math.exp(x))
