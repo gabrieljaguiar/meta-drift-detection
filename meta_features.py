@@ -1,13 +1,13 @@
 import tsfel
 from typing import List, Dict
 import random
-
+import pandas as pd
 
 # Features
-# abslute energy
-# total energy
-# centroid
-# entropy
+# abslute energy ok
+# total energy ok
+# centroid ok
+# entropy ok
 # Area under the curve
 # Average number of elements by class
 # Percentage of elements of the minority class
@@ -49,11 +49,20 @@ import random
 # noiSig (atrEnt - mutInf)/MutIn
 
 
-def extract_meta_features(instance: List) -> Dict:
+def extract_meta_features(features: List, classes: List) -> Dict:
+    meta_features = {}
     cfg = tsfel.get_features_by_domain()
     tsfel.time_series_features_extractor
-    meta_featuers = tsfel.mean_abs_diff(instance)
-    print(meta_featuers)
+    meta_features["abs_energy"] = tsfel.abs_energy(features)
+    # meta_features["total_energy"] = tsfel.total_energy(features)
+    # meta_features["centroid"] = tsfel.calc_centroid(features)
+    meta_features["entropy"] = tsfel.entropy(features)
+
+    max_number_of_classes = pd.Series(classes).value_counts().max()
+    min_number_of_classes = pd.Series(classes).value_counts().min()
+
+    print(max_number_of_classes)
+    print(min_number_of_classes)
 
 
 if __name__ == "__main__":
@@ -67,6 +76,10 @@ if __name__ == "__main__":
         for i in range(0, 5)
     ]
 
-    print(chunk)
+    classes = [(random.choice([0, 1])) for i in range(0, 5)]
 
-    extract_meta_features(chunk)
+    print(classes)
+
+    # print(chunk)
+
+    extract_meta_features(chunk, classes)
