@@ -2,6 +2,7 @@ import tsfel
 from typing import List, Dict
 import random
 import pandas as pd
+import numpy as np
 
 # Features
 # abslute energy ok
@@ -16,9 +17,42 @@ import pandas as pd
 # Number of attributes
 # Number of numeric attributes
 # Number of nominal (symbolic) attribute
+
 # Fisher's discriminant ratio
+# numerator <- function(j, data) {
+
+#  tmp <- branch(data, j)
+#  aux <- nrow(tmp) * (colMeans(tmp) -
+#    colMeans(data[,-ncol(data), drop=FALSE]))^2
+#  return(aux)
+# }
+
+# denominator <- function(j, data) {
+
+#  tmp <- branch(data, j)
+#  aux <- rowSums((t(tmp) - colMeans(tmp))^2)
+#  return(aux)
+# }
+
+# call denominator and numerator for each class
+# aux <- rowSums(do.call("cbind", num)) /
+#    rowSums(do.call("cbind", den))
+
 # Overlapping the per-class bounding boxes
+# compute max and minimum value of each column
+#   over <- colMax(rbind(colMin(maxmax) - colMax(minmin), 0))
+#   rang <- colMax(maxmax) - colMin(minmin)
+#   aux <- prod(over/rang, na.rm=TRUE)
+
 # Maximum individual feature efficiency
+#   data <- ovo(data)
+#  aux <- mapply(function(d) {
+#    colSums(nonOverlap(d))/nrow(d)
+#  }, d=data)
+
+# aux <- 1 - mean(colMax(aux))
+#  aux <- 1 - colMax(aux)
+#  return(aux)
 
 # attributes Number of attributes
 # numeric Number of numerical attributes
@@ -49,37 +83,47 @@ import pandas as pd
 # noiSig (atrEnt - mutInf)/MutIn
 
 
-def extract_meta_features(features: List, classes: List) -> Dict:
-    meta_features = {}
-    cfg = tsfel.get_features_by_domain()
-    tsfel.time_series_features_extractor
-    meta_features["abs_energy"] = tsfel.abs_energy(features)
-    # meta_features["total_energy"] = tsfel.total_energy(features)
-    # meta_features["centroid"] = tsfel.calc_centroid(features)
-    meta_features["entropy"] = tsfel.entropy(features)
+def extract_meta_features(
+    X: np, y: List, summary: List = None, tsfel_config: Dict = None
+) -> Dict:
+    if tsfel_config is None:
+        domain = tsfel.get_features_by_domain()
+        cfg = {}
+        cfg["temporal"] = domain.get("temporal")
 
-    max_number_of_classes = pd.Series(classes).value_counts().max()
-    min_number_of_classes = pd.Series(classes).value_counts().min()
+        print(cfg)
+    else:
+        cfg = tsfel_config
 
-    print(max_number_of_classes)
-    print(min_number_of_classes)
+    if summary is None:
+        summary = ["max", "min", "mean", "var"]
+
+    fs = X.shape[0] * 0.2
+    tsfel_features = tsfel.calc_window_features(cfg, X, fs=fs)
+    summarized = tsfel_features.T.groupby(lambda x: x.split("_", 1)[1]).agg(summary).T
+    flat = summarized.unstack().sort_index(level=1)
+    flat.columns = flat.columns.map("_".join)
+
+    pd.DataFrame(flat).to_csv("meta_features.csv")
+
+    # print(flat.columns)
 
 
 if __name__ == "__main__":
     chunk = [
-        (
-            random.uniform(0, 1),
-            random.uniform(0, 1),
-            random.uniform(0, 1),
-            random.uniform(0, 1),
-        )
-        for i in range(0, 5)
+        {
+            "col1": random.uniform(0, 1),
+            "col2": random.uniform(0, 1),
+            "col3": random.uniform(0, 1),
+            "col4": random.uniform(0, 1),
+        }
+        for i in range(0, 100)
     ]
 
-    classes = [(random.choice([0, 1])) for i in range(0, 5)]
+    classes = [(random.choice([0, 1])) for i in range(0, 100)]
 
-    print(classes)
+    df = pd.DataFrame(chunk)
 
     # print(chunk)
 
-    extract_meta_features(chunk, classes)
+    extract_meta_features(df, classes)
