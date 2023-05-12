@@ -3,6 +3,8 @@ from typing import List, Dict
 import random
 import pandas as pd
 import numpy as np
+from pymfe.mfe import MFE
+import warnings
 
 # Features
 # abslute energy ok
@@ -34,96 +36,103 @@ import numpy as np
 #  return(aux)
 # }
 
-# call denominator and numerator for each class
-# aux <- rowSums(do.call("cbind", num)) /
-#    rowSums(do.call("cbind", den))
-
-# Overlapping the per-class bounding boxes
-# compute max and minimum value of each column
-#   over <- colMax(rbind(colMin(maxmax) - colMax(minmin), 0))
-#   rang <- colMax(maxmax) - colMin(minmin)
-#   aux <- prod(over/rang, na.rm=TRUE)
-
-# Maximum individual feature efficiency
-#   data <- ovo(data)
-#  aux <- mapply(function(d) {
-#    colSums(nonOverlap(d))/nrow(d)
-#  }, d=data)
-
-# aux <- 1 - mean(colMax(aux))
-#  aux <- 1 - colMax(aux)
-#  return(aux)
-
-# attributes Number of attributes
-# numeric Number of numerical attributes
-# nominal Number of nominal attributes
-# samples Number of examples
-# dimension samples/attributes
-# numRate numeric/attributes
-# nomRate nominal/attributes
-# symbols (min, max, mean, sd, sum) Distributions of categories in attributes
-# classes (min, max, mean, sd) Classes distributions
-# Statistical (ST)
-# sks Skewness
-# sksP Skewness for normalized dataset
-# kts Kurtosis
-# ktsP Kurtosis for normalized datasets
-# absC Correlation between attributes
-# canC Canonical correlation between matrices
-# frac Fraction of canonical correlation
-# Information-theoretic (IN)
-# clEnt Class entropy
-# nClEnt Class entropy for normalized dataset
-# atrEnt Mean entropy of attributes
-# nAtrEnt Mean entropy of attributes for
-# normalized dataset
-# jEnt Joint entropy
-# mutInf Mutual information
-# eqAtr clEnt/mutInf
-# noiSig (atrEnt - mutInf)/MutIn
-
 
 def extract_meta_features(
-    X: np, y: List, summary: List = None, tsfel_config: Dict = None
+    X: pd.DataFrame,
+    y: pd.DataFrame,
+    summary: List = None,
+    tsfel_config: Dict = None,
+    mfe_feature_config: List = None,
 ) -> Dict:
     if tsfel_config is None:
         domain = tsfel.get_features_by_domain()
         cfg = {}
         cfg["temporal"] = domain.get("temporal")
-
-        print(cfg)
     else:
         cfg = tsfel_config
+
+    if mfe_feature_config == None:
+        mfe_feature_list = "all"
+    else:
+        mfe_feature_list = mfe_feature_config
 
     if summary is None:
         summary = ["max", "min", "mean", "var"]
 
-    fs = X.shape[0] * 0.2
-    tsfel_features = tsfel.calc_window_features(cfg, X, fs=fs)
-    summarized = tsfel_features.T.groupby(lambda x: x.split("_", 1)[1]).agg(summary).T
-    flat = summarized.unstack().sort_index(level=1)
-    flat.columns = flat.columns.map("_".join)
+    df_mfe_features, df_tsfel_features = None, None
 
-    pd.DataFrame(flat).to_csv("meta_features.csv")
+    if cfg != {}:
+        fs = X.shape[0] * 0.2
+        tsfel_features = tsfel.calc_window_features(cfg, X, fs=fs)
+        summarized = (
+            tsfel_features.T.groupby(lambda x: x.split("_", 1)[1]).agg(summary).T
+        )
+        flat = summarized.unstack().sort_index(level=1)
+        flat.columns = flat.columns.map("_".join)
 
-    # print(flat.columns)
+        df_tsfel_features = pd.DataFrame(flat)
+
+    if mfe_feature_list != []:
+        print("f1" in MFE.valid_metafeatures())
+        mfe_extractor = MFE(features=mfe_feature_list, summary=summary, groups=["all"])
+        mfe_extractor.fit(X.to_numpy(), y.to_numpy())
+        mfe_features = mfe_extractor.extract(verbose=1, suppress_warnings=True)
+        df_mfe_features = pd.DataFrame(mfe_features[1:], columns=mfe_features[0])
+
+    meta_features = pd.concat([df_mfe_features, df_tsfel_features], axis=1)
+
+    return meta_features.to_dict("records")
 
 
 if __name__ == "__main__":
-    chunk = [
-        {
-            "col1": random.uniform(0, 1),
-            "col2": random.uniform(0, 1),
-            "col3": random.uniform(0, 1),
-            "col4": random.uniform(0, 1),
-        }
-        for i in range(0, 100)
-    ]
+    from experimental_drifts import agrawal_no_drifts, META_STREAM_SIZE
 
-    classes = [(random.choice([0, 1])) for i in range(0, 100)]
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-    df = pd.DataFrame(chunk)
+    # agrawal_no_drifts = agrawal_no_drifts[0:1]
 
-    # print(chunk)
+    meta_database = []
 
-    extract_meta_features(df, classes)
+    for stream in agrawal_no_drifts:
+        X_array = []
+        y_array = []
+
+        for X, y in stream.take(META_STREAM_SIZE):
+            X_array.append(X)
+            y_array.append(y)
+
+        mfe_feature_list = [
+            "joint_ent",
+            "ns_ratio",
+            "can_cor",
+            "gravity",
+            "kurtosis",
+            "skewness",
+            "sparsity",
+            "f1",
+            "f1v",
+            "f2",
+            "f3",
+            "f4",
+            "n1",
+            "n2",
+        ]
+
+        df_X = pd.DataFrame(X_array)
+        df_y = pd.DataFrame(y_array)
+
+        mf = extract_meta_features(
+            df_X,
+            df_y,
+            summary=["mean", "var"],
+            mfe_feature_config=mfe_feature_list,
+            tsfel_config={},
+        )
+
+        print(mf)
+
+        meta_database += mf
+
+    df_meta_db = pd.DataFrame(meta_database)
+
+    df_meta_db.to_csv("mf.csv", index=None)
