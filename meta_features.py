@@ -85,7 +85,7 @@ def extract_meta_features(
 
 
 if __name__ == "__main__":
-    from experimental_drifts import agrawal_no_drifts, META_STREAM_SIZE
+    from train_generators import agrawal_no_drifts, META_STREAM_SIZE
 
     warnings.filterwarnings("ignore", category=DeprecationWarning)
 

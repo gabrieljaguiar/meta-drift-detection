@@ -3,7 +3,7 @@ from utils import evaluator
 from river.datasets import synth
 from river.drift import adwin, binary
 from river.tree import HoeffdingAdaptiveTreeClassifier
-from experimental_drifts import drifiting_streams, META_STREAM_SIZE
+from train_generators import drifiting_streams, META_STREAM_SIZE
 import pandas as pd
 from tqdm import tqdm
 

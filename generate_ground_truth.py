@@ -1,4 +1,4 @@
-from experimental_drifts import drifting_streams
+from train_generators import drifting_streams
 from utils import concept_drift
 
 
