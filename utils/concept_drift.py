@@ -113,11 +113,15 @@ class ConceptDriftStream(datasets.base.SyntheticDataset):
                 break
             yield nextElement
 
+    def reset(self):
+        self.instanceCount = 0
+        self.initialStreamIterator = iter(self.initialStream)
+        self.nextStreamIterator = iter(self.nextStream)
+
 
 if __name__ == "__main__":
     stream1 = synth.Agrawal(classification_function=0, seed=42)
     stream2 = synth.Agrawal(classification_function=8, seed=42)
-    # print(stream1)
 
     conceptDriftStream = ConceptDriftStream(
         stream1, stream2, width=1, position=500, angle=0

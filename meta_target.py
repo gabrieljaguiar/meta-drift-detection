@@ -5,18 +5,19 @@ from river.drift import adwin, binary
 from river.tree import HoeffdingAdaptiveTreeClassifier
 from experimental_drifts import drifiting_streams, META_STREAM_SIZE
 import pandas as pd
+from tqdm import tqdm
 
 
 window_size = 500
 idx = 0
 meta_dataset = []
-gen_idx = 0
 grace_period = int(META_STREAM_SIZE * 0.05)
+possible_delta_values = [(1 / i) for i in [10, 50, 100, 500, 1000, 5000, 10000]]
 
 range_for_drift = 100
 
 
-for g in drifiting_streams:
+for stream_id, g in tqdm(enumerate(drifiting_streams), total=len(drifiting_streams)):
     # print("generator {}".format(g.__str__()))
     streamEvaluator = evaluator.Evaluator(windowSize=window_size)
     model = HoeffdingAdaptiveTreeClassifier()
@@ -26,12 +27,16 @@ for g in drifiting_streams:
     if isinstance(g, concept_drift.ConceptDriftStream):
         drift_position = g.position
         drift_width = g.width
-        stream_name = g.name
+        stream_name = g.initialStream._repr_content.get("Name")
+        stream_name = "{}_{}_{}_{}".format(
+            stream_id, stream_name, drift_position, drift_width
+        )
         range_for_drift = max(range_for_drift, drift_width)
+        g.reset()
     else:
         drift_position = 0
         drift_width = 1
-        stream_name = g.__class__
+        stream_name = g._repr_content.get("Name")
 
     number_of_drifts_detected = 0
     distance_to_drift = 0
@@ -59,14 +64,11 @@ for g in drifiting_streams:
                 true_positive += 1
             else:
                 false_positive += 1
-            print("IDX: {} - Distance to drift: {}".format(idx, distance_to_drift))
 
         idx += 1
 
     if (drift_position > 0) and (true_positive == 0):
         false_negative += 1
-
-    gen_idx += 1
 
     meta_dataset.append(
         {

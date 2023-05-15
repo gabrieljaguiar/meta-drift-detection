@@ -8,14 +8,15 @@ DRIFT_POSITIONS = [500, 1000, 1500]
 
 DRIFT_SPEED = [1, 150, 250, 350]
 
+
 agrawal_no_drifts = [
     synth.Agrawal(classification_function=i, seed=42) for i in range(0, 9)
 ]
 
 agrawal_drifts = [
     concept_drift.ConceptDriftStream(
-        synth.Agrawal(classification_function=i, seed=42),
-        synth.Agrawal(classification_function=(i + 1), seed=42),
+        synth.Agrawal(classification_function=i, seed=(42 + i)),
+        synth.Agrawal(classification_function=(i + 1), seed=(42 + i + 1)),
         width=w,
         position=j,
         size=META_STREAM_SIZE,
@@ -23,4 +24,4 @@ agrawal_drifts = [
     for i, j, w in list(itertools.product(range(0, 8), DRIFT_POSITIONS, DRIFT_SPEED))
 ]
 
-drifiting_streams = agrawal_drifts
+drifiting_streams = agrawal_no_drifts + agrawal_drifts
