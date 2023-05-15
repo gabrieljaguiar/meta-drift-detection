@@ -79,6 +79,7 @@ class ConceptDriftStream(datasets.base.SyntheticDataset):
         self.angle = angle
         self.instanceCount = 0
         self.size = size
+        self.name = initialStream.__class__
         super().__init__(
             self.initialStream.task,
             self.initialStream.n_features,

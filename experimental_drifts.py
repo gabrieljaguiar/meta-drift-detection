@@ -22,3 +22,5 @@ agrawal_drifts = [
     )
     for i, j, w in list(itertools.product(range(0, 8), DRIFT_POSITIONS, DRIFT_SPEED))
 ]
+
+drifiting_streams = agrawal_drifts

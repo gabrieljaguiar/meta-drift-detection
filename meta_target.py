@@ -3,55 +3,82 @@ from utils import evaluator
 from river.datasets import synth
 from river.drift import adwin, binary
 from river.tree import HoeffdingAdaptiveTreeClassifier
-from experimental_drifts import drifting_streams
+from experimental_drifts import drifiting_streams, META_STREAM_SIZE
 import pandas as pd
 
 
-# How to evaluate
-# Drift was detected after a real drift? If yes, how many instances after.
-# Delay between drift happening and detection.
-# Drift detection when there was no drift (False Alarms).
-
-# What chunk of data are we gonna use? Sliding window in a big stream with multiple drifts
-# One "small" data stream with only one drift in multiple positions
-# We cannot use a big stream as one meta-instance does not "look real"
-
-# How we are going to adapt the concept drift on the fly? Each X instances we check features?
-# Every detected drift we check features?
-
-
-stream_sizes = 100000
 window_size = 500
 idx = 0
-detected_drifts = []
+meta_dataset = []
 gen_idx = 0
+grace_period = int(META_STREAM_SIZE * 0.05)
 
-for g in drifting_streams:
-    print("generator {}".format(g.__str__()))
+range_for_drift = 100
+
+
+for g in drifiting_streams:
+    # print("generator {}".format(g.__str__()))
     streamEvaluator = evaluator.Evaluator(windowSize=window_size)
     model = HoeffdingAdaptiveTreeClassifier()
     drift_detector = adwin.ADWIN()
     idx = 0
 
-    for x, y in g.take(stream_sizes):
+    if isinstance(g, concept_drift.ConceptDriftStream):
+        drift_position = g.position
+        drift_width = g.width
+        stream_name = g.name
+        range_for_drift = max(range_for_drift, drift_width)
+    else:
+        drift_position = 0
+        drift_width = 1
+        stream_name = g.__class__
+
+    number_of_drifts_detected = 0
+    distance_to_drift = 0
+
+    true_positive = 0
+    false_positive = 0
+    false_negative = 0
+
+    for x, y in g.take(META_STREAM_SIZE):
         y_hat = model.predict_proba_one(x)
         y_predicted = model.predict_one(x)
 
-        drift_detector.update(1 if y == y_predicted else 0)
-
         streamEvaluator.addResult((x, y), y_hat)
         model.learn_one(x, y)
-
-        if (idx + 1) % window_size == 0:
-            print("Accuracy at {}: {}%".format(idx, streamEvaluator.getAccuracy()))
+        if idx >= grace_period:
+            drift_detector.update(1 if y == y_predicted else 0)
 
         if drift_detector.drift_detected:
-            detected_drifts.append({"g": gen_idx, "idx": idx})
+            distance_to_drift += abs(idx - drift_position)
+            number_of_drifts_detected += 1
+            if (drift_position > 0) and (
+                (idx <= drift_position + range_for_drift)
+                or (idx >= drift_position - range_for_drift)
+            ):
+                true_positive += 1
+            else:
+                false_positive += 1
+            print("IDX: {} - Distance to drift: {}".format(idx, distance_to_drift))
 
         idx += 1
 
+    if (drift_position > 0) and (true_positive == 0):
+        false_negative += 1
+
     gen_idx += 1
 
+    meta_dataset.append(
+        {
+            "stream": stream_name,
+            "drift_position": drift_position,
+            "detection_delay": distance_to_drift,
+            "tpr": true_positive,
+            "fnr": false_negative,
+            "fpr": false_positive,
+        }
+    )
 
-df = pd.DataFrame(detected_drifts)
+
+df = pd.DataFrame(meta_dataset)
 df.to_csv("meta_target.csv", index=False)
