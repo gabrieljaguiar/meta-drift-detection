@@ -71,6 +71,7 @@ class ConceptDriftStream(datasets.base.SyntheticDataset):
         position: int,
         size: int,
         angle: float = 0,
+        seed: int = 42,
     ):
         self.initialStream = initialStream
         self.nextStream = nextStream
@@ -80,6 +81,7 @@ class ConceptDriftStream(datasets.base.SyntheticDataset):
         self.instanceCount = 0
         self.size = size
         self.name = initialStream.__class__
+        self._rng = random.Random(seed)
         super().__init__(
             self.initialStream.task,
             self.initialStream.n_features,
@@ -106,7 +108,7 @@ class ConceptDriftStream(datasets.base.SyntheticDataset):
             try:
                 nextElement = (
                     next(self.initialStreamIterator)
-                    if random.random() > driftProbability
+                    if self._rng.random() > driftProbability
                     else next(self.nextStreamIterator)
                 )
             except StopIteration:

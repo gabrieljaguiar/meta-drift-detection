@@ -6,36 +6,6 @@ import numpy as np
 from pymfe.mfe import MFE
 import warnings
 
-# Features
-# abslute energy ok
-# total energy ok
-# centroid ok
-# entropy ok
-# Area under the curve
-# Average number of elements by class
-# Percentage of elements of the minority class
-# Percentage of elements of the majority class
-# Number of classes
-# Number of attributes
-# Number of numeric attributes
-# Number of nominal (symbolic) attribute
-
-# Fisher's discriminant ratio
-# numerator <- function(j, data) {
-
-#  tmp <- branch(data, j)
-#  aux <- nrow(tmp) * (colMeans(tmp) -
-#    colMeans(data[,-ncol(data), drop=FALSE]))^2
-#  return(aux)
-# }
-
-# denominator <- function(j, data) {
-
-#  tmp <- branch(data, j)
-#  aux <- rowSums((t(tmp) - colMeans(tmp))^2)
-#  return(aux)
-# }
-
 
 def extract_meta_features(
     X: pd.DataFrame,

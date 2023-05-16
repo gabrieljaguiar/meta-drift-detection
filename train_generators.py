@@ -47,4 +47,61 @@ agrawal_drifts = [
     for i, j, w in list(itertools.product(range(0, 8), DRIFT_POSITIONS, DRIFT_SPEED))
 ]
 
+mixed_drifts = [
+    concept_drift.ConceptDriftStream(
+        synth.Mixed(classification_function=0, seed=i),
+        synth.Mixed(classification_function=1, seed=(i + 5)),
+        width=w,
+        position=j,
+        size=META_STREAM_SIZE,
+    )
+    for i, j, w in list(itertools.product(range(42, 46), DRIFT_POSITIONS, DRIFT_SPEED))
+]
+
+mixed_drifts = mixed_drifts + [
+    concept_drift.ConceptDriftStream(
+        synth.Mixed(classification_function=1, seed=i),
+        synth.Mixed(classification_function=0, seed=(i + 5)),
+        width=w,
+        position=j,
+        size=META_STREAM_SIZE,
+    )
+    for i, j, w in list(itertools.product(range(46, 50), DRIFT_POSITIONS, DRIFT_SPEED))
+]
+
+LED_drifts = [
+    concept_drift.ConceptDriftStream(
+        synth.LED(seed=42, noise_percentage=i, irrelevant_features=True),
+        synth.LED(seed=42, noise_percentage=(i * 2), irrelevant_features=False),
+        width=w,
+        position=j,
+        size=META_STREAM_SIZE,
+    )
+    for i, j, w in list(
+        itertools.product([0.01, 0.05, 0.10, 0.15], DRIFT_POSITIONS, DRIFT_SPEED)
+    )
+]
+
+hyperplane_drifts = [
+    concept_drift.ConceptDriftStream(
+        synth.Hyperplane(seed=(42 + i), n_drift_features=(2 + i)),
+        synth.Hyperplane(seed=(42 + i), n_drift_features=(2 + i + 1)),
+        width=w,
+        position=j,
+        size=META_STREAM_SIZE,
+    )
+    for i, j, w in list(itertools.product(range(0, 4), DRIFT_POSITIONS, DRIFT_SPEED))
+]
+
+rbf_drift = [
+    concept_drift.ConceptDriftStream(
+        synth.RandomRBF(seed_model=(42 + i), n_centroids=i),
+        synth.RandomRBF(seed_model=(42 + i), n_centroids=i + 2),
+        width=w,
+        position=j,
+        size=META_STREAM_SIZE,
+    )
+    for i, j, w in list(itertools.product(range(2, 6), DRIFT_POSITIONS, DRIFT_SPEED))
+]
+
 drifiting_streams = agrawal_no_drifts + agrawal_drifts

@@ -2,11 +2,15 @@ from utils import concept_drift
 from utils import evaluator
 from river.datasets import synth
 from river.drift import adwin, binary
-from river.tree import HoeffdingAdaptiveTreeClassifier
+from river.tree import HoeffdingTreeClassifier
 from train_generators import drifiting_streams, META_STREAM_SIZE
 import pandas as pd
 from tqdm import tqdm
 
+
+# formula avgdd = dd/number_of_detected_drifts #lower the better
+# detection_ratio = (fnr + fpr) / (tpr + 1) # lower the better
+# avgdd*10^detection_ratio #lower the better
 
 window_size = 500
 idx = 0
@@ -18,9 +22,8 @@ range_for_drift = 100
 
 
 for stream_id, g in tqdm(enumerate(drifiting_streams), total=len(drifiting_streams)):
-    # print("generator {}".format(g.__str__()))
     streamEvaluator = evaluator.Evaluator(windowSize=window_size)
-    model = HoeffdingAdaptiveTreeClassifier()
+    model = HoeffdingTreeClassifier()
     drift_detector = adwin.ADWIN()
     idx = 0
 
@@ -37,6 +40,9 @@ for stream_id, g in tqdm(enumerate(drifiting_streams), total=len(drifiting_strea
         drift_position = 0
         drift_width = 1
         stream_name = g._repr_content.get("Name")
+        stream_name = "{}_{}_{}_{}".format(
+            stream_id, stream_name, drift_position, drift_width
+        )
 
     number_of_drifts_detected = 0
     distance_to_drift = 0
@@ -45,9 +51,12 @@ for stream_id, g in tqdm(enumerate(drifiting_streams), total=len(drifiting_strea
     false_positive = 0
     false_negative = 0
 
+    stream_data = []
+
     for x, y in g.take(META_STREAM_SIZE):
         y_hat = model.predict_proba_one(x)
         y_predicted = model.predict_one(x)
+        stream_data.append(y)
 
         streamEvaluator.addResult((x, y), y_hat)
         model.learn_one(x, y)
@@ -59,7 +68,7 @@ for stream_id, g in tqdm(enumerate(drifiting_streams), total=len(drifiting_strea
             number_of_drifts_detected += 1
             if (drift_position > 0) and (
                 (idx <= drift_position + range_for_drift)
-                or (idx >= drift_position - range_for_drift)
+                and (idx >= drift_position - range_for_drift)
             ):
                 true_positive += 1
             else:
@@ -67,19 +76,19 @@ for stream_id, g in tqdm(enumerate(drifiting_streams), total=len(drifiting_strea
 
         idx += 1
 
-    if (drift_position > 0) and (true_positive == 0):
+    if (drift_position > 0) and (true_positive == 0) and (false_positive == 0):
         false_negative += 1
 
-    meta_dataset.append(
-        {
-            "stream": stream_name,
-            "drift_position": drift_position,
-            "detection_delay": distance_to_drift,
-            "tpr": true_positive,
-            "fnr": false_negative,
-            "fpr": false_positive,
-        }
-    )
+    item = {
+        "stream": stream_name,
+        "drift_position": drift_position,
+        "detection_delay": distance_to_drift,
+        "tpr": true_positive,
+        "fnr": false_negative,
+        "fpr": false_positive,
+    }
+
+    meta_dataset.append(item)
 
 
 df = pd.DataFrame(meta_dataset)
