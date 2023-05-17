@@ -27,6 +27,12 @@ LED_no_drifts = [
     for i in [0.01, 0.05, 0.10, 0.15]
 ]
 
+
+LED_no_drifts += [
+    synth.LED(seed=42, noise_percentage=i, irrelevant_features=False)
+    for i in [0.01, 0.05, 0.10, 0.15]
+]
+
 hyperplane_no_drifts = [
     synth.Hyperplane(seed=(42 + i), n_drift_features=(2 + i)) for i in range(0, 7)
 ]
@@ -72,6 +78,19 @@ mixed_drifts = mixed_drifts + [
 LED_drifts = [
     concept_drift.ConceptDriftStream(
         synth.LED(seed=42, noise_percentage=i, irrelevant_features=True),
+        synth.LED(seed=42, noise_percentage=(i * 2), irrelevant_features=True),
+        width=w,
+        position=j,
+        size=META_STREAM_SIZE,
+    )
+    for i, j, w in list(
+        itertools.product([0.01, 0.05, 0.10, 0.15], DRIFT_POSITIONS, DRIFT_SPEED)
+    )
+]
+
+LED_drifts += [
+    concept_drift.ConceptDriftStream(
+        synth.LED(seed=42, noise_percentage=i, irrelevant_features=False),
         synth.LED(seed=42, noise_percentage=(i * 2), irrelevant_features=False),
         width=w,
         position=j,
@@ -104,4 +123,15 @@ rbf_drift = [
     for i, j, w in list(itertools.product(range(2, 6), DRIFT_POSITIONS, DRIFT_SPEED))
 ]
 
-drifiting_streams = agrawal_no_drifts + agrawal_drifts
+drifiting_streams = (
+    agrawal_no_drifts
+    + mixed_no_drifts
+    + LED_no_drifts
+    + hyperplane_no_drifts
+    + rbf_no_drift
+    + agrawal_drifts
+    + mixed_drifts
+    + LED_drifts
+    + hyperplane_drifts
+    + rbf_drift
+)

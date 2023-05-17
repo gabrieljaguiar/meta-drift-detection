@@ -1,10 +1,10 @@
 import tsfel
 from typing import List, Dict
-import random
 import pandas as pd
-import numpy as np
 from pymfe.mfe import MFE
 import warnings
+from tqdm import tqdm
+from utils import concept_drift
 
 
 def extract_meta_features(
@@ -31,78 +31,86 @@ def extract_meta_features(
 
     df_mfe_features, df_tsfel_features = None, None
 
-    if cfg != {}:
-        fs = X.shape[0] * 0.2
-        tsfel_features = tsfel.calc_window_features(cfg, X, fs=fs)
-        summarized = (
-            tsfel_features.T.groupby(lambda x: x.split("_", 1)[1]).agg(summary).T
-        )
-        flat = summarized.unstack().sort_index(level=1)
-        flat.columns = flat.columns.map("_".join)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=Warning)
+        if cfg != {}:
+            fs = X.shape[0] * 0.2
+            tsfel_features = tsfel.calc_window_features(cfg, X, fs=fs)
+            summarized = (
+                tsfel_features.T.groupby(lambda x: x.split("_", 1)[1]).agg(summary).T
+            )
+            flat = summarized.unstack().sort_index(level=1)
+            flat.columns = flat.columns.map("_".join)
 
-        df_tsfel_features = pd.DataFrame(flat)
+            df_tsfel_features = pd.DataFrame(flat)
 
-    if mfe_feature_list != []:
-        print("f1" in MFE.valid_metafeatures())
-        mfe_extractor = MFE(features=mfe_feature_list, summary=summary, groups=["all"])
-        mfe_extractor.fit(X.to_numpy(), y.to_numpy())
-        mfe_features = mfe_extractor.extract(verbose=1, suppress_warnings=True)
-        df_mfe_features = pd.DataFrame(mfe_features[1:], columns=mfe_features[0])
+        if mfe_feature_list != []:
+            mfe_extractor = MFE(
+                features=mfe_feature_list, summary=summary, groups=["all"]
+            )
+            mfe_extractor.fit(X.to_numpy(), y.to_numpy())
+            mfe_features = mfe_extractor.extract(verbose=0, suppress_warnings=True)
+            df_mfe_features = pd.DataFrame(mfe_features[1:], columns=mfe_features[0])
 
-    meta_features = pd.concat([df_mfe_features, df_tsfel_features], axis=1)
+        meta_features = pd.concat([df_mfe_features, df_tsfel_features], axis=1)
 
     return meta_features.to_dict("records")
 
 
 if __name__ == "__main__":
-    from train_generators import agrawal_no_drifts, META_STREAM_SIZE
+    from train_generators import drifiting_streams, META_STREAM_SIZE
 
-    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    mfe_feature_list = [
+        "joint_ent",
+        "ns_ratio",
+        "can_cor",
+        "gravity",
+        "kurtosis",
+        "skewness",
+        "sparsity",
+        "f1",
+        "f1v",
+        "f2",
+        "f3",
+        "f4",
+        "n1",
+        "n2",
+    ]
 
-    # agrawal_no_drifts = agrawal_no_drifts[0:1]
+    collected_mf = []
 
-    meta_database = []
+    for stream_id, g in tqdm(
+        enumerate(drifiting_streams), total=len(drifiting_streams)
+    ):
+        if isinstance(g, concept_drift.ConceptDriftStream):
+            drift_position = g.position
+            drift_width = g.width
+            stream_name = g.initialStream._repr_content.get("Name")
 
-    for stream in agrawal_no_drifts:
-        X_array = []
-        y_array = []
+        else:
+            drift_position = 0
+            drift_width = 1
+            stream_name = g._repr_content.get("Name")
 
-        for X, y in stream.take(META_STREAM_SIZE):
-            X_array.append(X)
-            y_array.append(y)
+        stream_name = "{}_{}_{}_{}".format(
+            stream_id, stream_name, drift_position, drift_width
+        )
+        data = list(g.take(META_STREAM_SIZE))
+        pd_X = pd.DataFrame([data[i][0] for i in range(0, META_STREAM_SIZE)])
+        pd_y = pd.DataFrame([data[i][1] for i in range(0, META_STREAM_SIZE)])
 
-        mfe_feature_list = [
-            "joint_ent",
-            "ns_ratio",
-            "can_cor",
-            "gravity",
-            "kurtosis",
-            "skewness",
-            "sparsity",
-            "f1",
-            "f1v",
-            "f2",
-            "f3",
-            "f4",
-            "n1",
-            "n2",
-        ]
-
-        df_X = pd.DataFrame(X_array)
-        df_y = pd.DataFrame(y_array)
-
-        mf = extract_meta_features(
-            df_X,
-            df_y,
-            summary=["mean", "var"],
-            mfe_feature_config=mfe_feature_list,
+        dict_mf = extract_meta_features(
+            pd_X,
+            pd_y,
+            summary=["mean", "sd"],
             tsfel_config={},
+            mfe_feature_config=mfe_feature_list,
         )
 
-        print(mf)
+        dict_mf[0]["stream_name"] = stream_name
+        collected_mf += dict_mf
 
-        meta_database += mf
+    pd_mf = pd.DataFrame(collected_mf)
+    pd_mf.dropna(axis=1, how="all", inplace=True)
 
-    df_meta_db = pd.DataFrame(meta_database)
-
-    df_meta_db.to_csv("mf.csv", index=None)
+    pd_mf.to_csv("training_meta_features.csv", index=None)

@@ -95,7 +95,6 @@ class ConceptDriftStream(datasets.base.SyntheticDataset):
 
     def __iter__(self):
         while True:
-            self.instanceCount += 1
             if self.instanceCount == self.size:
                 break
 
@@ -113,6 +112,8 @@ class ConceptDriftStream(datasets.base.SyntheticDataset):
                 )
             except StopIteration:
                 break
+
+            self.instanceCount += 1
             yield nextElement
 
     def reset(self):
