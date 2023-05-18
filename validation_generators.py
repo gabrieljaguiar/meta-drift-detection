@@ -36,3 +36,155 @@ stagger_no_drift = [
 ]
 
 waveform_no_drift = [synth.Waveform(seed=i) for i in range(10, 40, 5)]
+
+
+random_tree_drift = [
+    concept_drift.ConceptDriftStream(
+        synth.RandomTree(seed_tree=i, seed_sample=i),
+        concept_drift.ConceptDriftStream(
+            synth.RandomTree(seed_tree=i * 2, seed_sample=i * 2),
+            concept_drift.ConceptDriftStream(
+                synth.RandomTree(seed_tree=i * 3, seed_sample=i * 3),
+                concept_drift.ConceptDriftStream(
+                    synth.RandomTree(seed_tree=i * 4, seed_sample=i * 4),
+                    synth.RandomTree(seed_tree=i * 5, seed_sample=i * 5),
+                    position=20000,
+                    width=w,
+                    size=META_STREAM_SIZE,
+                ),
+                position=20000,
+                width=w,
+                size=META_STREAM_SIZE,
+            ),
+            position=20000,
+            width=w,
+            size=META_STREAM_SIZE,
+        ),
+        position=20000,
+        width=w,
+        size=META_STREAM_SIZE,
+    )
+    for i, w in list(itertools.product(range(10, 40, step=10), DRIFT_SPEED))
+]
+
+sea_drift = [
+    concept_drift.ConceptDriftStream(
+        synth.SEA(variant=0, seed=42),
+        concept_drift.ConceptDriftStream(
+            synth.SEA(variant=1, seed=42),
+            concept_drift.ConceptDriftStream(
+                synth.SEA(variant=2, seed=42),
+                concept_drift.ConceptDriftStream(
+                    synth.SEA(variant=0, seed=42),
+                    synth.SEA(variant=1, seed=42),
+                    position=20000,
+                    width=w,
+                    size=META_STREAM_SIZE,
+                ),
+                position=20000,
+                width=w,
+                size=META_STREAM_SIZE,
+            ),
+            position=20000,
+            width=w,
+            size=META_STREAM_SIZE,
+        ),
+        position=20000,
+        width=w,
+        size=META_STREAM_SIZE,
+    )
+    for w in DRIFT_SPEED
+]
+
+
+sine_drift = [
+    concept_drift.ConceptDriftStream(
+        synth.Sine(classification_function=0, seed=42, balance_classes=True),
+        concept_drift.ConceptDriftStream(
+            synth.Sine(classification_function=1, seed=42, balance_classes=True),
+            concept_drift.ConceptDriftStream(
+                synth.Sine(classification_function=2, seed=42, balance_classes=True),
+                concept_drift.ConceptDriftStream(
+                    synth.Sine(
+                        classification_function=3, seed=42, balance_classes=True
+                    ),
+                    synth.Sine(
+                        classification_function=1, seed=42, balance_classes=True
+                    ),
+                    position=20000,
+                    width=w,
+                    size=META_STREAM_SIZE,
+                ),
+                position=20000,
+                width=w,
+                size=META_STREAM_SIZE,
+            ),
+            position=20000,
+            width=w,
+            size=META_STREAM_SIZE,
+        ),
+        position=20000,
+        width=w,
+        size=META_STREAM_SIZE,
+    )
+    for w in DRIFT_SPEED
+]
+
+stagger_drift = [
+    concept_drift.ConceptDriftStream(
+        synth.STAGGER(classification_function=0, seed=42),
+        concept_drift.ConceptDriftStream(
+            synth.STAGGER(classification_function=1, seed=42),
+            concept_drift.ConceptDriftStream(
+                synth.STAGGER(classification_function=2, seed=42),
+                concept_drift.ConceptDriftStream(
+                    synth.STAGGER(classification_function=0, seed=42),
+                    synth.STAGGER(classification_function=1, seed=42),
+                    position=20000,
+                    width=w,
+                    size=META_STREAM_SIZE,
+                ),
+                position=20000,
+                width=w,
+                size=META_STREAM_SIZE,
+            ),
+            position=20000,
+            width=w,
+            size=META_STREAM_SIZE,
+        ),
+        position=20000,
+        width=w,
+        size=META_STREAM_SIZE,
+    )
+    for w in DRIFT_SPEED
+]
+
+
+waveform_drift = [
+    concept_drift.ConceptDriftStream(
+        synth.Waveform(seed=i),
+        concept_drift.ConceptDriftStream(
+            synth.Waveform(seed=i * 2),
+            concept_drift.ConceptDriftStream(
+                synth.Waveform(seed=i * 3),
+                concept_drift.ConceptDriftStream(
+                    synth.Waveform(seed=i * 4),
+                    synth.Waveform(seed=i * 5),
+                    position=20000,
+                    width=w,
+                    size=META_STREAM_SIZE,
+                ),
+                position=20000,
+                width=w,
+                size=META_STREAM_SIZE,
+            ),
+            position=20000,
+            width=w,
+            size=META_STREAM_SIZE,
+        ),
+        position=20000,
+        width=w,
+        size=META_STREAM_SIZE,
+    )
+    for i, w in list(itertools.product(range(10, 40, step=10), DRIFT_SPEED))
+]
