@@ -20,6 +20,9 @@ if not os.path.exists("meta_target.csv"):
     possible_delta_values = [
         (1 / i)
         for i in [
+            2,
+            5,
+            8,
             10,
             20,
             30,
@@ -76,12 +79,9 @@ if not os.path.exists("meta_target.csv"):
             false_positive = 0
             false_negative = 0
 
-            stream_data = []
-
             for x, y in g.take(META_STREAM_SIZE):
                 y_hat = model.predict_proba_one(x)
                 y_predicted = model.predict_one(x)
-                stream_data.append(y)
 
                 streamEvaluator.addResult((x, y), y_hat)
                 model.learn_one(x, y)
@@ -141,5 +141,3 @@ else:
     meta_target_filtered = meta_target_df.loc[
         meta_target_df.groupby("stream").score.idxmin()
     ].reset_index(drop=True)
-
-    print(meta_target_filtered["delta_value"].value_counts())

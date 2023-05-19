@@ -64,7 +64,7 @@ random_tree_drift = [
         width=w,
         size=META_STREAM_SIZE,
     )
-    for i, w in list(itertools.product(range(10, 40, step=10), DRIFT_SPEED))
+    for i, w in list(itertools.product(range(10, 40, 10), DRIFT_SPEED))
 ]
 
 sea_drift = [
@@ -186,5 +186,19 @@ waveform_drift = [
         width=w,
         size=META_STREAM_SIZE,
     )
-    for i, w in list(itertools.product(range(10, 40, step=10), DRIFT_SPEED))
+    for i, w in list(itertools.product(range(10, 40, 10), DRIFT_SPEED))
 ]
+
+
+validation_drifting_streams = (
+    random_tree_no_drift
+    + random_tree_drift
+    + sea_no_drift
+    + sea_drift
+    + stagger_no_drift
+    + stagger_drift
+    + waveform_no_drift
+    + waveform_no_drift
+)
+
+validation_drifting_streams = random_tree_drift
