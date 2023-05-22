@@ -198,7 +198,5 @@ validation_drifting_streams = (
     + stagger_no_drift
     + stagger_drift
     + waveform_no_drift
-    + waveform_no_drift
+    + waveform_drift
 )
-
-validation_drifting_streams = random_tree_drift

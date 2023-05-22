@@ -1,16 +1,16 @@
-# HERE IMPORT GENERATED VALIDATION DATA STREAMS
-# TRAIN A MODEL ON META_FEATURES
-# EVAL THEM USING HT AND ADWIN VALUES GIVEN BY THE MODEL
-# EVAL THE PERFORMANCE OF CONCEPT DRIFT DETECTOR WITH MAJORITY VALUE (BASELINE)
-from utils import concept_drift
-import numpy as np
-from river.drift import adwin, binary
-from river.tree import HoeffdingTreeClassifier
-from validation_generators import validation_drifting_streams, META_STREAM_SIZE
-import pandas as pd
 from tqdm import tqdm
-import os
+from utils import concept_drift
 from utils import adaptiveADWIN
+from utils.queue import Queue
+from river.tree import HoeffdingTreeClassifier
+from meta_features import extract_meta_features
+from sklearn.impute import SimpleImputer
+from sklearn.ensemble import RandomForestRegressor
+from validation_generators import validation_drifting_streams, META_STREAM_SIZE
+
+import os
+import pandas as pd
+import numpy as np
 
 
 def find_nearest(array, value):
@@ -21,7 +21,9 @@ def find_nearest(array, value):
     return array[idx]
 
 
-MODEL = "FIXED"  # FIXED for fixed adwin value or META for meta stream
+MODEL = "META"  # FIXED for fixed adwin value or META for meta stream
+META_WINDOW_SIZE = 1500
+STRIDE_WINDOW = 500
 
 
 meta_target_df = pd.read_csv("meta_target.csv")
@@ -30,7 +32,61 @@ meta_target_filtered = meta_target_df.loc[
     meta_target_df.groupby("stream").score.idxmin()
 ].reset_index(drop=True)
 
+filling_imputer = SimpleImputer(
+    missing_values=np.nan, strategy="constant", fill_value=0
+)
+
+if MODEL == "META":
+    training_meta_features = pd.read_csv("./training_meta_features.csv")
+
+    training_meta_features = training_meta_features.fillna(0)
+
+    meta_target = meta_target_filtered.loc[:, ["stream", "delta_value"]]
+
+    meta_dataset = training_meta_features.merge(
+        right=meta_target, how="left", left_on="stream_name", right_on="stream"
+    )
+
+    meta_dataset.drop("stream_name", axis=1, inplace=True)
+
+    idx_column = "stream"
+    class_column = "delta_value"
+
+    meta_model = RandomForestRegressor(random_state=42)
+
+    meta_model.fit(
+        X=meta_dataset.loc[
+            :, meta_dataset.columns.difference([idx_column, class_column])
+        ],
+        y=meta_dataset.loc[:, class_column],
+    )
+
+    if not os.path.exists("meta_dataset.csv"):
+        meta_dataset.to_csv("meta_dataset.csv", index=None)
+
+    mfe_feature_list = [
+        "joint_ent",
+        "ns_ratio",
+        "can_cor",
+        "gravity",
+        "kurtosis",
+        "skewness",
+        "sparsity",
+        "f1",
+        "f1v",
+        "f2",
+        "f3",
+        "f4",
+        "n1",
+        "n2",
+    ]
+
+    summary = ["mean", "sd"]
+    tsfel_config = {}
+
 range_for_drift = 100
+
+results = []
 
 
 for stream_id, g in tqdm(
@@ -48,8 +104,6 @@ for stream_id, g in tqdm(
             drift_position += g.position
             drift_positions.append(drift_position)
             next_stream = next_stream.nextStream
-
-        print(drift_positions)
         g.reset()
     else:
         drift_positions = []
@@ -62,11 +116,12 @@ for stream_id, g in tqdm(
         )
 
     if MODEL == "META":
-        evaluation_window = []
+        X_queue = Queue(META_WINDOW_SIZE)
+        y_queue = Queue(META_WINDOW_SIZE)
 
     model = HoeffdingTreeClassifier()
 
-    drift_detector = adaptiveADWIN.AdaptiveADWIN(delta=0.1)
+    drift_detector = adaptiveADWIN.AdaptiveADWIN(delta=0.5)  # default baseline
 
     number_of_drifts_detected = 0
     distance_to_drift = 0
@@ -90,6 +145,8 @@ for stream_id, g in tqdm(
     except IndexError:
         next_drift = 0
 
+    stride = 0
+
     for x, y in g.take(META_STREAM_SIZE):
         if (idx > (next_drift + range_for_drift)) and (next_drift > 0):
             next_drift_idx += 1
@@ -105,7 +162,26 @@ for stream_id, g in tqdm(
 
         if MODEL == "META":
             # Append to the list, control size of list, stride to extract meta_features and update ADWIN delta with the meta-model
-            evaluation_window.append(x)
+            X_queue.insert(x)
+            y_queue.insert(y)
+            stride += 1
+
+            if (
+                X_queue.getNumberOfElements() == META_WINDOW_SIZE
+                and stride >= STRIDE_WINDOW
+            ):
+                stride = 0
+                meta_features = extract_meta_features(
+                    pd.DataFrame(X_queue.getQueue()),
+                    pd.DataFrame(y_queue.getQueue()),
+                    summary=summary,
+                    tsfel_config=tsfel_config,
+                    mfe_feature_config=mfe_feature_list,
+                )
+                meta_features_df = pd.DataFrame(meta_features)
+                meta_features_df.fillna(0, inplace=True)
+                adwin_prediction = meta_model.predict(meta_features_df)
+                drift_detector.updateDelta(adwin_prediction)
 
         y_hat = model.predict_proba_one(x)
         y_predicted = model.predict_one(x)
@@ -131,9 +207,15 @@ for stream_id, g in tqdm(
 
     item = {
         "stream": stream_name,
+        "model": MODEL,
         "drift_position": drift_position,
         "detection_delay": distance_to_drift,
         "tpr": true_positive,
         "fnr": false_negative,
         "fpr": false_positive,
     }
+
+    results.append(item)
+
+
+pd.DataFrame(results).to_csv("results_{}.csv".format(MODEL))

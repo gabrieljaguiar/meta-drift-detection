@@ -14,4 +14,4 @@ class AdaptiveADWIN(ADWIN):
         )
 
     def updateDelta(self, delta: float):
-        print(self._helper.__dict__)
+        self._helper.delta = delta
