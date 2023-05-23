@@ -10,8 +10,9 @@ from utils import concept_drift
 def extract_meta_features(
     X: pd.DataFrame,
     y: pd.DataFrame,
-    summary: List = None,
+    summary_tsfel: List = None,
     tsfel_config: Dict = None,
+    summary_mfe: List = None,
     mfe_feature_config: List = None,
 ) -> Dict:
     if tsfel_config is None:
@@ -26,8 +27,10 @@ def extract_meta_features(
     else:
         mfe_feature_list = mfe_feature_config
 
-    if summary is None:
-        summary = ["max", "min", "mean", "var"]
+    if summary_mfe is None:
+        summary_mfe = ["max", "min", "mean", "var"]
+    if summary_tsfel is None:
+        summary_tsfel = ["max", "min", "mean", "var"]
 
     df_mfe_features, df_tsfel_features = None, None
 
@@ -37,7 +40,9 @@ def extract_meta_features(
             fs = X.shape[0] * 0.2
             tsfel_features = tsfel.calc_window_features(cfg, X, fs=fs)
             summarized = (
-                tsfel_features.T.groupby(lambda x: x.split("_", 1)[1]).agg(summary).T
+                tsfel_features.T.groupby(lambda x: x.split("_", 1)[1])
+                .agg(summary_tsfel)
+                .T
             )
             flat = summarized.unstack().sort_index(level=1)
             flat.columns = flat.columns.map("_".join)
@@ -46,7 +51,7 @@ def extract_meta_features(
 
         if mfe_feature_list != []:
             mfe_extractor = MFE(
-                features=mfe_feature_list, summary=summary, groups=["all"]
+                features=mfe_feature_list, summary=summary_mfe, groups=["all"]
             )
             mfe_extractor.fit(X.to_numpy(), y.to_numpy())
             mfe_features = mfe_extractor.extract(verbose=0, suppress_warnings=True)
@@ -102,8 +107,9 @@ if __name__ == "__main__":
         dict_mf = extract_meta_features(
             pd_X,
             pd_y,
-            summary=["mean", "sd"],
-            tsfel_config={},
+            summary_tsfel=["mean", "std"],
+            summary_mfe=["mean", "sd"],
+            tsfel_config=None,
             mfe_feature_config=mfe_feature_list,
         )
 
@@ -111,6 +117,7 @@ if __name__ == "__main__":
         collected_mf += dict_mf
 
     pd_mf = pd.DataFrame(collected_mf)
+    pd_mf.fillna(0, inplace=True)
     pd_mf.dropna(axis=1, how="all", inplace=True)
 
-    pd_mf.to_csv("training_meta_features.csv", index=None)
+    pd_mf.to_csv("training_meta_features_set_2.csv", index=None)

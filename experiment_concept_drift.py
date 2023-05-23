@@ -37,7 +37,7 @@ filling_imputer = SimpleImputer(
 )
 
 if MODEL == "META":
-    training_meta_features = pd.read_csv("./training_meta_features.csv")
+    training_meta_features = pd.read_csv("./training_meta_features_set_2.csv")
 
     training_meta_features = training_meta_features.fillna(0)
 
@@ -54,10 +54,10 @@ if MODEL == "META":
 
     meta_model = RandomForestRegressor(random_state=42)
 
+    feature_columns = meta_dataset.columns.difference([idx_column, class_column])
+
     meta_model.fit(
-        X=meta_dataset.loc[
-            :, meta_dataset.columns.difference([idx_column, class_column])
-        ],
+        X=meta_dataset.loc[:, feature_columns],
         y=meta_dataset.loc[:, class_column],
     )
 
@@ -81,17 +81,16 @@ if MODEL == "META":
         "n2",
     ]
 
-    summary = ["mean", "sd"]
-    tsfel_config = {}
+    summary_tsfel = ["mean", "std"]
+    summary_mfe = ["mean", "sd"]
+    tsfel_config = None
 
 range_for_drift = 100
 
 results = []
 
 
-for stream_id, g in tqdm(
-    enumerate(validation_drifting_streams), total=len(validation_drifting_streams)
-):
+for stream_id, g in enumerate(validation_drifting_streams):
     if isinstance(g, concept_drift.ConceptDriftStream):
         drift_width = g.width
         stream_name = g.initialStream._repr_content.get("Name")
@@ -147,7 +146,9 @@ for stream_id, g in tqdm(
 
     stride = 0
 
-    for x, y in g.take(META_STREAM_SIZE):
+    print(stream_name)
+
+    for i, (x, y) in tqdm(enumerate(g.take(META_STREAM_SIZE)), total=META_STREAM_SIZE):
         if (idx > (next_drift + range_for_drift)) and (next_drift > 0):
             next_drift_idx += 1
             try:
@@ -174,13 +175,17 @@ for stream_id, g in tqdm(
                 meta_features = extract_meta_features(
                     pd.DataFrame(X_queue.getQueue()),
                     pd.DataFrame(y_queue.getQueue()),
-                    summary=summary,
+                    summary_mfe=summary_mfe,
+                    summary_tsfel=summary_tsfel,
                     tsfel_config=tsfel_config,
                     mfe_feature_config=mfe_feature_list,
                 )
+
                 meta_features_df = pd.DataFrame(meta_features)
                 meta_features_df.fillna(0, inplace=True)
-                adwin_prediction = meta_model.predict(meta_features_df)
+                adwin_prediction = meta_model.predict(
+                    meta_features_df.loc[:, feature_columns]
+                )
                 drift_detector.updateDelta(adwin_prediction)
 
         y_hat = model.predict_proba_one(x)

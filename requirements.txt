@@ -2,3 +2,5 @@ tsfel
 river
 numpy
 pandas
+pymfe
+tqdm
