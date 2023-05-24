@@ -19,6 +19,8 @@ DRIFT_POSITIONS = [20000, 40000, 60000, 80000]
 
 DRIFT_SPEED = [1, 150, 250, 350]
 
+DRIFT_SPEED = [1]
+
 
 random_tree_no_drift = [
     synth.RandomTree(seed_tree=i, seed_sample=i) for i in range(20, 25)
@@ -40,14 +42,18 @@ waveform_no_drift = [synth.Waveform(seed=i) for i in range(10, 40, 5)]
 
 random_tree_drift = [
     concept_drift.ConceptDriftStream(
-        synth.RandomTree(seed_tree=i, seed_sample=i),
+        synth.RandomTree(seed_tree=i, seed_sample=i, max_tree_depth=1),
         concept_drift.ConceptDriftStream(
-            synth.RandomTree(seed_tree=i * 2, seed_sample=i * 2),
+            synth.RandomTree(seed_tree=i * 2, seed_sample=i * 2, max_tree_depth=3),
             concept_drift.ConceptDriftStream(
-                synth.RandomTree(seed_tree=i * 3, seed_sample=i * 3),
+                synth.RandomTree(seed_tree=i * 3, seed_sample=i * 3, max_tree_depth=6),
                 concept_drift.ConceptDriftStream(
-                    synth.RandomTree(seed_tree=i * 4, seed_sample=i * 4),
-                    synth.RandomTree(seed_tree=i * 5, seed_sample=i * 5),
+                    synth.RandomTree(
+                        seed_tree=i * 4, seed_sample=i * 4, max_tree_depth=1
+                    ),
+                    synth.RandomTree(
+                        seed_tree=i * 5, seed_sample=i * 5, max_tree_depth=8
+                    ),
                     position=20000,
                     width=w,
                     size=META_STREAM_SIZE,
@@ -190,7 +196,7 @@ waveform_drift = [
 ]
 
 
-validation_drifting_streams = (
+"""validation_drifting_streams = (
     random_tree_no_drift
     + random_tree_drift
     + sea_no_drift
@@ -199,4 +205,6 @@ validation_drifting_streams = (
     + stagger_drift
     + waveform_no_drift
     + waveform_drift
-)
+)"""
+
+validation_drifting_streams = random_tree_drift

@@ -2,7 +2,10 @@ from tqdm import tqdm
 from utils import concept_drift
 from utils import adaptiveADWIN
 from utils.queue import Queue
+from utils.evaluator import Evaluator
 from river.tree import HoeffdingTreeClassifier
+from river.neighbors import KNNClassifier
+from river import naive_bayes
 from meta_features import extract_meta_features
 from sklearn.impute import SimpleImputer
 from sklearn.ensemble import RandomForestRegressor
@@ -21,9 +24,10 @@ def find_nearest(array, value):
     return array[idx]
 
 
-MODEL = "META"  # FIXED for fixed adwin value or META for meta stream
+MODEL = "FIXED"  # FIXED for fixed adwin value or META for meta stream
 META_WINDOW_SIZE = 1500
 STRIDE_WINDOW = 500
+EVALUATION_WINDOW = 500
 
 
 meta_target_df = pd.read_csv("meta_target.csv")
@@ -114,12 +118,17 @@ for stream_id, g in enumerate(validation_drifting_streams):
             stream_id, stream_name, drift_position, drift_width
         )
 
+    print(stream_name)
+
     if MODEL == "META":
         X_queue = Queue(META_WINDOW_SIZE)
         y_queue = Queue(META_WINDOW_SIZE)
 
-    model = HoeffdingTreeClassifier()
+    # model = HoeffdingTreeClassifier()
 
+    # model = KNNClassifier(n_neighbors=5)
+
+    model = naive_bayes.GaussianNB()
     drift_detector = adaptiveADWIN.AdaptiveADWIN(delta=0.5)  # default baseline
 
     number_of_drifts_detected = 0
@@ -146,7 +155,11 @@ for stream_id, g in enumerate(validation_drifting_streams):
 
     stride = 0
 
-    print(stream_name)
+    stream_results = []
+
+    evaluator = Evaluator(
+        EVALUATION_WINDOW, g.n_classes if g.n_classes is not None else 2
+    )
 
     for i, (x, y) in tqdm(enumerate(g.take(META_STREAM_SIZE)), total=META_STREAM_SIZE):
         if (idx > (next_drift + range_for_drift)) and (next_drift > 0):
@@ -190,6 +203,7 @@ for stream_id, g in enumerate(validation_drifting_streams):
 
         y_hat = model.predict_proba_one(x)
         y_predicted = model.predict_one(x)
+        evaluator.addResult((x, y), y_hat)
 
         model.learn_one(x, y)
         if idx >= grace_period:
@@ -208,7 +222,14 @@ for stream_id, g in enumerate(validation_drifting_streams):
             else:
                 false_positive += 1
 
+        if (idx + 1) % EVALUATION_WINDOW == 0:
+            eval_item = {"idx": idx, "accuracy": evaluator.getAccuracy()}
+            stream_results.append(eval_item)
+
         idx += 1
+
+    metrics_df = pd.DataFrame(stream_results)
+    metrics_df.to_csv("./metrics/{}.csv".format(stream_name))
 
     item = {
         "stream": stream_name,

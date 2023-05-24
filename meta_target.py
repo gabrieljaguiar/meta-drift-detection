@@ -1,5 +1,5 @@
 from utils import concept_drift
-from utils import evaluator
+from utils.evaluator import Evaluator
 from river.datasets import synth
 from river.drift import adwin, binary
 from river.tree import HoeffdingTreeClassifier
@@ -12,7 +12,9 @@ import os
 # detection_ratio = (fnr + fpr) / (tpr + 1) # lower the better
 # avgdd*10^detection_ratio #lower the better
 
-if not os.path.exists("meta_target.csv"):
+EVALUATION_WINDOW = 250
+
+if not os.path.exists("meta_target_backup.csv"):
     window_size = 500
     idx = 0
     meta_dataset = []
@@ -43,14 +45,18 @@ if not os.path.exists("meta_target.csv"):
         ]
     ]
 
+    possible_delta_values = [0.1]
+
     range_for_drift = 100
 
     for delta_value in possible_delta_values:
         print("Evaluating for delta = {}".format(delta_value))
+
+        stream_results = []
+
         for stream_id, g in tqdm(
             enumerate(drifiting_streams), total=len(drifiting_streams)
         ):
-            streamEvaluator = evaluator.Evaluator(windowSize=window_size)
             model = HoeffdingTreeClassifier()
             drift_detector = adwin.ADWIN(delta=delta_value)
             idx = 0
@@ -79,11 +85,14 @@ if not os.path.exists("meta_target.csv"):
             false_positive = 0
             false_negative = 0
 
+            stream_results = []
+            evaluator = Evaluator(EVALUATION_WINDOW, g.n_classes)
+
             for x, y in g.take(META_STREAM_SIZE):
                 y_hat = model.predict_proba_one(x)
                 y_predicted = model.predict_one(x)
 
-                streamEvaluator.addResult((x, y), y_hat)
+                evaluator.addResult((x, y), y_hat)
                 model.learn_one(x, y)
                 if idx >= grace_period:
                     drift_detector.update(1 if y == y_predicted else 0)
@@ -103,7 +112,14 @@ if not os.path.exists("meta_target.csv"):
                     else:
                         false_positive += 1
 
+                if (idx + 1) % EVALUATION_WINDOW == 0:
+                    eval_item = {"idx": idx, "accuracy": evaluator.getAccuracy()}
+                    stream_results.append(eval_item)
+
                 idx += 1
+
+            metrics_df = pd.DataFrame(stream_results)
+            metrics_df.to_csv("./metrics/{}.csv".format(stream_name))
 
             if (drift_position > 0) and (true_positive == 0) and (false_positive == 0):
                 false_negative += 1
@@ -134,7 +150,7 @@ if not os.path.exists("meta_target.csv"):
             meta_dataset.append(item)
 
         df = pd.DataFrame(meta_dataset)
-        df.to_csv("meta_target.csv", index=False)
+        df.to_csv("meta_target_backup.csv", index=False)
 else:
     meta_target_df = pd.read_csv("meta_target.csv")
 
