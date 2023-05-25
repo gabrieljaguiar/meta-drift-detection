@@ -1,6 +1,8 @@
 from river.datasets import synth
 from utils import concept_drift
+from utils.generators.sea import SEAMod
 import itertools
+import random
 
 # TRAIN GENERATORS: AGRAWAL, Mixed, LED, Hyperplane, RandomRBF
 
@@ -19,14 +21,15 @@ DRIFT_POSITIONS = [20000, 40000, 60000, 80000]
 
 DRIFT_SPEED = [1, 150, 250, 350]
 
-DRIFT_SPEED = [1]
+rng = random.Random(42)
 
 
 random_tree_no_drift = [
-    synth.RandomTree(seed_tree=i, seed_sample=i) for i in range(20, 25)
+    synth.RandomTree(seed_tree=i, seed_sample=i, max_tree_depth=((i % 2) + 1))
+    for i in range(20, 25)
 ]
 
-sea_no_drift = [synth.SEA(variant=i, seed=42) for i in range(0, 3)]
+sea_no_drift = [SEAMod(variant=i, seed=42, noise=0.0) for i in range(0, 6)]
 
 sine_no_drift = [
     synth.Sine(classification_function=i, seed=42, balance_classes=True)
@@ -36,8 +39,6 @@ sine_no_drift = [
 stagger_no_drift = [
     synth.STAGGER(classification_function=i, seed=42) for i in range(0, 3)
 ]
-
-waveform_no_drift = [synth.Waveform(seed=i) for i in range(10, 40, 5)]
 
 
 random_tree_drift = [
@@ -73,16 +74,21 @@ random_tree_drift = [
     for i, w in list(itertools.product(range(10, 40, 10), DRIFT_SPEED))
 ]
 
+
+sea_variants = [0, 1, 2, 3, 4, 5]
+comb = list(itertools.permutations(sea_variants, 5))
+variants = rng.sample(comb, 6)
+print(variants)
 sea_drift = [
     concept_drift.ConceptDriftStream(
-        synth.SEA(variant=0, seed=42),
+        SEAMod(variant=v[0], seed=42),
         concept_drift.ConceptDriftStream(
-            synth.SEA(variant=1, seed=42),
+            SEAMod(variant=v[1], seed=42),
             concept_drift.ConceptDriftStream(
-                synth.SEA(variant=2, seed=42),
+                SEAMod(variant=v[2], seed=42),
                 concept_drift.ConceptDriftStream(
-                    synth.SEA(variant=0, seed=42),
-                    synth.SEA(variant=1, seed=42),
+                    SEAMod(variant=v[3], seed=42),
+                    SEAMod(variant=v[4], seed=42),
                     position=20000,
                     width=w,
                     size=META_STREAM_SIZE,
@@ -99,7 +105,7 @@ sea_drift = [
         width=w,
         size=META_STREAM_SIZE,
     )
-    for w in DRIFT_SPEED
+    for v, w in list(itertools.product(variants, DRIFT_SPEED))
 ]
 
 
@@ -166,45 +172,13 @@ stagger_drift = [
 ]
 
 
-waveform_drift = [
-    concept_drift.ConceptDriftStream(
-        synth.Waveform(seed=i),
-        concept_drift.ConceptDriftStream(
-            synth.Waveform(seed=i * 2),
-            concept_drift.ConceptDriftStream(
-                synth.Waveform(seed=i * 3),
-                concept_drift.ConceptDriftStream(
-                    synth.Waveform(seed=i * 4),
-                    synth.Waveform(seed=i * 5),
-                    position=20000,
-                    width=w,
-                    size=META_STREAM_SIZE,
-                ),
-                position=20000,
-                width=w,
-                size=META_STREAM_SIZE,
-            ),
-            position=20000,
-            width=w,
-            size=META_STREAM_SIZE,
-        ),
-        position=20000,
-        width=w,
-        size=META_STREAM_SIZE,
-    )
-    for i, w in list(itertools.product(range(10, 40, 10), DRIFT_SPEED))
-]
-
-
-"""validation_drifting_streams = (
+validation_drifting_streams = (
     random_tree_no_drift
     + random_tree_drift
     + sea_no_drift
     + sea_drift
     + stagger_no_drift
     + stagger_drift
-    + waveform_no_drift
-    + waveform_drift
-)"""
+)
 
-validation_drifting_streams = random_tree_drift
+validation_drifting_streams = sea_drift

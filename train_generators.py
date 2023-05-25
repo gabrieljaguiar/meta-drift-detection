@@ -2,11 +2,15 @@ from river.datasets import synth
 from utils import concept_drift
 import itertools
 
-META_STREAM_SIZE = 2000
+META_STREAM_SIZE = 10000
 
 DRIFT_POSITIONS = [500, 1000, 1500]
 
 DRIFT_SPEED = [1, 150, 250, 350]
+
+DRIFT_SPEED = [1]
+
+DRIFT_POSITIONS = [2500, 5000, 7500]
 
 # TRAIN GENERATORS: AGRAWAL, Mixed, LED, Hyperplane, RandomRBF
 
@@ -17,21 +21,26 @@ DRIFT_SPEED = [1, 150, 250, 350]
 
 
 agrawal_no_drifts = [
-    synth.Agrawal(classification_function=i, seed=42) for i in range(0, 9)
+    synth.Agrawal(
+        classification_function=i, seed=42, balance_classes=True, perturbation=0
+    )
+    for i in range(0, 9)
 ]
 
-mixed_no_drifts = [synth.Mixed(classification_function=i, seed=42) for i in range(0, 2)]
+mixed_no_drifts = [
+    synth.Mixed(classification_function=i, seed=42) for i in range(0, 2)
+]  # add seeds to increase number of samples
 
-LED_no_drifts = [
-    synth.LED(seed=42, noise_percentage=i, irrelevant_features=True)
-    for i in [0.01, 0.05, 0.10, 0.15]
-]
+# LED_no_drifts = [
+#    synth.LED(seed=42, noise_percentage=i, irrelevant_features=True)
+#    for i in [0.01, 0.05, 0.10, 0.15]
+# ]
 
 
-LED_no_drifts += [
-    synth.LED(seed=42, noise_percentage=i, irrelevant_features=False)
-    for i in [0.01, 0.05, 0.10, 0.15]
-]
+# LED_no_drifts = [
+#    synth.LED(seed=42, noise_percentage=i, irrelevant_features=False)
+#    for i in [0.01, 0.05, 0.10, 0.15]
+# ]
 
 hyperplane_no_drifts = [
     synth.Hyperplane(seed=(42 + i), n_drift_features=(2 + i)) for i in range(0, 7)
@@ -44,8 +53,10 @@ rbf_no_drift = [
 
 agrawal_drifts = [
     concept_drift.ConceptDriftStream(
-        synth.Agrawal(classification_function=i, seed=(42 + i)),
-        synth.Agrawal(classification_function=(i + 1), seed=(42 + i + 1)),
+        synth.Agrawal(classification_function=i, seed=(42 + i), balance_classes=True),
+        synth.Agrawal(
+            classification_function=(i + 1), seed=(42 + i + 1), balance_classes=True
+        ),
         width=w,
         position=j,
         size=META_STREAM_SIZE,
@@ -124,14 +135,14 @@ rbf_drift = [
 ]
 
 drifiting_streams = (
-    agrawal_no_drifts
-    + mixed_no_drifts
-    + LED_no_drifts
-    + hyperplane_no_drifts
-    + rbf_no_drift
-    + agrawal_drifts
-    + mixed_drifts
-    + LED_drifts
+    # agrawal_no_drifts
+    # mixed_no_drifts
+    # LED_no_drifts
+    hyperplane_no_drifts
+    # + rbf_no_drift
+    # + agrawal_drifts
+    # + mixed_drifts
+    # + LED_drifts
     + hyperplane_drifts
-    + rbf_drift
+    # + rbf_drift
 )

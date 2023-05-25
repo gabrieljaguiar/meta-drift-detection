@@ -3,6 +3,7 @@ from utils.evaluator import Evaluator
 from river.datasets import synth
 from river.drift import adwin, binary
 from river.tree import HoeffdingTreeClassifier
+from river import naive_bayes
 from train_generators import drifiting_streams, META_STREAM_SIZE
 import pandas as pd
 from tqdm import tqdm
@@ -12,9 +13,9 @@ import os
 # detection_ratio = (fnr + fpr) / (tpr + 1) # lower the better
 # avgdd*10^detection_ratio #lower the better
 
-EVALUATION_WINDOW = 250
+EVALUATION_WINDOW = 500
 
-if not os.path.exists("meta_target_backup.csv"):
+if not os.path.exists("meta_target_backup2.csv"):
     window_size = 500
     idx = 0
     meta_dataset = []
@@ -57,7 +58,8 @@ if not os.path.exists("meta_target_backup.csv"):
         for stream_id, g in tqdm(
             enumerate(drifiting_streams), total=len(drifiting_streams)
         ):
-            model = HoeffdingTreeClassifier()
+            # model = HoeffdingTreeClassifier()
+            model = naive_bayes.GaussianNB()
             drift_detector = adwin.ADWIN(delta=delta_value)
             idx = 0
 
