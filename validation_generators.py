@@ -78,7 +78,7 @@ random_tree_drift = [
 sea_variants = [0, 1, 2, 3, 4, 5]
 comb = list(itertools.permutations(sea_variants, 5))
 variants = rng.sample(comb, 6)
-print(variants)
+
 sea_drift = [
     concept_drift.ConceptDriftStream(
         SEAMod(variant=v[0], seed=42),

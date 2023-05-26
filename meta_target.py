@@ -15,7 +15,7 @@ import os
 
 EVALUATION_WINDOW = 500
 
-if not os.path.exists("meta_target_backup2.csv"):
+if not os.path.exists("meta_target.csv"):
     window_size = 500
     idx = 0
     meta_dataset = []
@@ -45,8 +45,6 @@ if not os.path.exists("meta_target_backup2.csv"):
             10000000,
         ]
     ]
-
-    possible_delta_values = [0.1]
 
     range_for_drift = 100
 
@@ -94,7 +92,7 @@ if not os.path.exists("meta_target_backup2.csv"):
                 y_hat = model.predict_proba_one(x)
                 y_predicted = model.predict_one(x)
 
-                evaluator.addResult((x, y), y_hat)
+                # evaluator.addResult((x, y), y_hat)
                 model.learn_one(x, y)
                 if idx >= grace_period:
                     drift_detector.update(1 if y == y_predicted else 0)
@@ -114,14 +112,14 @@ if not os.path.exists("meta_target_backup2.csv"):
                     else:
                         false_positive += 1
 
-                if (idx + 1) % EVALUATION_WINDOW == 0:
-                    eval_item = {"idx": idx, "accuracy": evaluator.getAccuracy()}
-                    stream_results.append(eval_item)
+                # if (idx + 1) % EVALUATION_WINDOW == 0:
+                #    eval_item = {"idx": idx, "accuracy": evaluator.getAccuracy()}
+                #    stream_results.append(eval_item)
 
                 idx += 1
 
-            metrics_df = pd.DataFrame(stream_results)
-            metrics_df.to_csv("./metrics/{}.csv".format(stream_name))
+            # metrics_df = pd.DataFrame(stream_results)
+            # metrics_df.to_csv("./metrics/{}.csv".format(stream_name))
 
             if (drift_position > 0) and (true_positive == 0) and (false_positive == 0):
                 false_negative += 1
@@ -152,7 +150,7 @@ if not os.path.exists("meta_target_backup2.csv"):
             meta_dataset.append(item)
 
         df = pd.DataFrame(meta_dataset)
-        df.to_csv("meta_target_backup.csv", index=False)
+        df.to_csv("meta_target.csv", index=False)
 else:
     meta_target_df = pd.read_csv("meta_target.csv")
 
