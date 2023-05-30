@@ -129,7 +129,7 @@ for stream_id, g in enumerate(validation_drifting_streams):
     # model = KNNClassifier(n_neighbors=5)
 
     model = naive_bayes.GaussianNB()
-    drift_detector = adaptiveADWIN.AdaptiveADWIN(delta=0.5)  # default baseline
+    drift_detector = adaptiveADWIN.AdaptiveADWIN(delta=0.2)  # default baseline
 
     number_of_drifts_detected = 0
     distance_to_drift = 0
