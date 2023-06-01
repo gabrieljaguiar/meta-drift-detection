@@ -180,5 +180,3 @@ validation_drifting_streams = (
     + stagger_no_drift
     + stagger_drift
 )
-
-validation_drifting_streams = sea_drift

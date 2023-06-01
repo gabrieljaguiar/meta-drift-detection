@@ -14,6 +14,39 @@ from validation_generators import validation_drifting_streams, META_STREAM_SIZE
 import os
 import pandas as pd
 import numpy as np
+import argparse
+
+
+parser = argparse.ArgumentParser(description="Meta-Drift evaluation")
+
+
+parser.add_argument("--model", type=str, help="FIXED or META", default="FIXED")
+
+parser.add_argument(
+    "--mf",
+    type=str,
+    help="Meta-feature file to be used",
+    default="training_meta_features_set_1.csv",
+)
+
+parser.add_argument("--output", type=str, help="FIXED or META", default="results")
+
+parser.add_argument("--ew", type=int, default=500, help="Evaluation window size")
+
+parser.add_argument(
+    "--st", type=int, default=500, help="Stride of evaluation window size"
+)
+
+parser.add_argument("--mt", type=int, default=1500, help="Meta window size")
+
+parser.add_argument(
+    "--save-metrics",
+    default=False,
+    help="If metrics file should be created",
+    action="store_true",
+)
+
+args = parser.parse_args()
 
 
 def find_nearest(array, value):
@@ -24,10 +57,17 @@ def find_nearest(array, value):
     return array[idx]
 
 
-MODEL = "FIXED"  # FIXED for fixed adwin value or META for meta stream
-META_WINDOW_SIZE = 1500
-STRIDE_WINDOW = 500
-EVALUATION_WINDOW = 500
+MODEL = args.model  # FIXED for fixed adwin value or META for meta stream
+META_WINDOW_SIZE = args.mt
+STRIDE_WINDOW = args.st
+EVALUATION_WINDOW = args.ew
+
+print("Starting experiment")
+print("MODEL: {}".format(MODEL))
+print("OUTPUT FILE: {}".format(args.output))
+print("META-WINDOW: {}".format(META_WINDOW_SIZE))
+print("STRIDE_WINDOW: {}".format(STRIDE_WINDOW))
+print("EVALUATION_WINDOW: {}".format(EVALUATION_WINDOW))
 
 
 meta_target_df = pd.read_csv("meta_target.csv")
@@ -41,7 +81,8 @@ filling_imputer = SimpleImputer(
 )
 
 if MODEL == "META":
-    training_meta_features = pd.read_csv("./training_meta_features_set_2.csv")
+    print("META_FEATURE FILE: {}".format(args.mf))
+    training_meta_features = pd.read_csv("./{}".format(args.mf))
 
     training_meta_features = training_meta_features.fillna(0)
 
@@ -227,9 +268,9 @@ for stream_id, g in enumerate(validation_drifting_streams):
             stream_results.append(eval_item)
 
         idx += 1
-
-    metrics_df = pd.DataFrame(stream_results)
-    metrics_df.to_csv("./metrics/{}.csv".format(stream_name))
+    if args.save_metrics:
+        metrics_df = pd.DataFrame(stream_results)
+        metrics_df.to_csv("./metrics/{}.csv".format(stream_name))
 
     item = {
         "stream": stream_name,
@@ -244,4 +285,4 @@ for stream_id, g in enumerate(validation_drifting_streams):
     results.append(item)
 
 
-pd.DataFrame(results).to_csv("results_{}.csv".format(MODEL))
+pd.DataFrame(results).to_csv("{}".format(args.output))
