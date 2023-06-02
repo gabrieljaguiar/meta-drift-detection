@@ -15,7 +15,7 @@ import os
 import pandas as pd
 import numpy as np
 import argparse
-
+import multiprocessing
 
 parser = argparse.ArgumentParser(description="Meta-Drift evaluation")
 
@@ -46,7 +46,23 @@ parser.add_argument(
     action="store_true",
 )
 
+parser.add_argument("--n-jobs", type=int, default=-1, help="Number of multiple process")
+
 args = parser.parse_args()
+
+
+MODEL = args.model  # FIXED for fixed adwin value or META for meta stream
+META_WINDOW_SIZE = args.mt
+STRIDE_WINDOW = args.st
+EVALUATION_WINDOW = args.ew
+N_JOBS = multiprocessing.cpu_count() if args.n_jobs == -1 else args.n_jobs
+
+print("Starting experiment")
+print("MODEL: {}".format(MODEL))
+print("OUTPUT FILE: {}".format(args.output))
+print("META-WINDOW: {}".format(META_WINDOW_SIZE))
+print("STRIDE_WINDOW: {}".format(STRIDE_WINDOW))
+print("EVALUATION_WINDOW: {}".format(EVALUATION_WINDOW))
 
 
 def find_nearest(array, value):
@@ -57,85 +73,14 @@ def find_nearest(array, value):
     return array[idx]
 
 
-MODEL = args.model  # FIXED for fixed adwin value or META for meta stream
-META_WINDOW_SIZE = args.mt
-STRIDE_WINDOW = args.st
-EVALUATION_WINDOW = args.ew
-
-print("Starting experiment")
-print("MODEL: {}".format(MODEL))
-print("OUTPUT FILE: {}".format(args.output))
-print("META-WINDOW: {}".format(META_WINDOW_SIZE))
-print("STRIDE_WINDOW: {}".format(STRIDE_WINDOW))
-print("EVALUATION_WINDOW: {}".format(EVALUATION_WINDOW))
+def print_class(c):
+    idx, classe = c
+    print(idx)
 
 
-meta_target_df = pd.read_csv("meta_target.csv")
-
-meta_target_filtered = meta_target_df.loc[
-    meta_target_df.groupby("stream").score.idxmin()
-].reset_index(drop=True)
-
-filling_imputer = SimpleImputer(
-    missing_values=np.nan, strategy="constant", fill_value=0
-)
-
-if MODEL == "META":
-    print("META_FEATURE FILE: {}".format(args.mf))
-    training_meta_features = pd.read_csv("./{}".format(args.mf))
-
-    training_meta_features = training_meta_features.fillna(0)
-
-    meta_target = meta_target_filtered.loc[:, ["stream", "delta_value"]]
-
-    meta_dataset = training_meta_features.merge(
-        right=meta_target, how="left", left_on="stream_name", right_on="stream"
-    )
-
-    meta_dataset.drop("stream_name", axis=1, inplace=True)
-
-    idx_column = "stream"
-    class_column = "delta_value"
-
-    meta_model = RandomForestRegressor(random_state=42)
-
-    feature_columns = meta_dataset.columns.difference([idx_column, class_column])
-
-    meta_model.fit(
-        X=meta_dataset.loc[:, feature_columns],
-        y=meta_dataset.loc[:, class_column],
-    )
-
-    if not os.path.exists("meta_dataset.csv"):
-        meta_dataset.to_csv("meta_dataset.csv", index=None)
-
-    mfe_feature_list = [
-        "joint_ent",
-        "ns_ratio",
-        "can_cor",
-        "gravity",
-        "kurtosis",
-        "skewness",
-        "sparsity",
-        "f1",
-        "f1v",
-        "f2",
-        "f3",
-        "f4",
-        "n1",
-        "n2",
-    ]
-
-    summary_tsfel = ["mean", "std"]
-    summary_mfe = ["mean", "sd"]
-    tsfel_config = None
-
-range_for_drift = 100
-
-results = []
-
-
-for stream_id, g in enumerate(validation_drifting_streams):
+def task(arg):
+    global MODEL, META_WINDOW_SIZE, STRIDE_WINDOW, EVALUATION_WINDOW
+    stream_id, g = arg
     if isinstance(g, concept_drift.ConceptDriftStream):
         drift_width = g.width
         stream_name = g.initialStream._repr_content.get("Name")
@@ -282,7 +227,84 @@ for stream_id, g in enumerate(validation_drifting_streams):
         "fpr": false_positive,
     }
 
-    results.append(item)
+    return item
 
 
-pd.DataFrame(results).to_csv("{}".format(args.output))
+meta_target_df = pd.read_csv("meta_target.csv")
+
+meta_target_filtered = meta_target_df.loc[
+    meta_target_df.groupby("stream").score.idxmin()
+].reset_index(drop=True)
+
+filling_imputer = SimpleImputer(
+    missing_values=np.nan, strategy="constant", fill_value=0
+)
+
+if MODEL == "META":
+    print("META_FEATURE FILE: {}".format(args.mf))
+    training_meta_features = pd.read_csv("./{}".format(args.mf))
+
+    training_meta_features = training_meta_features.fillna(0)
+
+    meta_target = meta_target_filtered.loc[:, ["stream", "delta_value"]]
+
+    meta_dataset = training_meta_features.merge(
+        right=meta_target, how="left", left_on="stream_name", right_on="stream"
+    )
+
+    meta_dataset.drop("stream_name", axis=1, inplace=True)
+
+    idx_column = "stream"
+    class_column = "delta_value"
+
+    meta_model = RandomForestRegressor(random_state=42)
+
+    feature_columns = meta_dataset.columns.difference([idx_column, class_column])
+
+    meta_model.fit(
+        X=meta_dataset.loc[:, feature_columns],
+        y=meta_dataset.loc[:, class_column],
+    )
+
+    if not os.path.exists("meta_dataset.csv"):
+        meta_dataset.to_csv("meta_dataset.csv", index=None)
+
+    mfe_feature_list = [
+        "joint_ent",
+        "ns_ratio",
+        "can_cor",
+        "gravity",
+        "kurtosis",
+        "skewness",
+        "sparsity",
+        "f1",
+        "f1v",
+        "f2",
+        "f3",
+        "f4",
+        "n1",
+        "n2",
+    ]
+
+    summary_tsfel = ["mean", "std"]
+    summary_mfe = ["mean", "sd"]
+    tsfel_config = None
+
+range_for_drift = 100
+
+results = []
+
+from joblib import Parallel, delayed
+
+out = Parallel(n_jobs=2)(
+    delayed(print_class)(i) for i in enumerate(validation_drifting_streams)
+)
+
+print(out)
+
+# with multiprocessing.pool.Pool(N_JOBS) as pool:
+#    for result in pool.imap(task, enumerate(agrawal_drifts)):
+#        results.append(results)
+
+# for stream_id, g in enumerate(validation_drifting_streams):
+#    results.append(task(g))

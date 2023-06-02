@@ -122,6 +122,7 @@ class ConceptDriftStream(datasets.base.SyntheticDataset):
         self.nextStreamIterator = iter(self.nextStream)
 
 
+"""
 if __name__ == "__main__":
     stream1 = synth.Agrawal(classification_function=0, seed=42)
     stream2 = synth.Agrawal(classification_function=8, seed=42)
@@ -134,3 +135,4 @@ if __name__ == "__main__":
 
     for x, y in slicer:
         print(x, y)
+"""
