@@ -1,10 +1,33 @@
-import tsfel
-from typing import List, Dict
-import pandas as pd
-from pymfe.mfe import MFE
-import warnings
 from tqdm import tqdm
+from pymfe.mfe import MFE
 from utils import concept_drift
+from typing import List, Dict
+from joblib import Parallel, delayed
+
+import warnings
+import argparse
+import tsfel
+import pandas as pd
+
+parser = argparse.ArgumentParser(description="Meta-feature extraction")
+
+parser.add_argument(
+    "--output", type=str, help="output file", default="meta_features.csv"
+)
+
+parser.add_argument(
+    "--feature-set",
+    type=int,
+    help="Set of features to be used. 1 = MFE, 2 = TSFEL, 3 = BOTH",
+    default=1,
+)
+
+parser.add_argument("--n-jobs", type=int, default=-1, help="Number of multiple process")
+
+args = parser.parse_args()
+
+N_JOBS = args.n_jobs
+SET_GROUP = args.feature_set
 
 
 def extract_meta_features(
@@ -62,6 +85,51 @@ def extract_meta_features(
     return meta_features.to_dict("records")
 
 
+def task(arg):
+    global META_WINDOW_SIZE, SET_GROUP
+    stream_id, g = arg
+    range_for_drift = 100
+
+    if isinstance(g, concept_drift.ConceptDriftStream):
+        drift_position = g.position
+        drift_width = g.width
+        stream_name = g.initialStream._repr_content.get("Name")
+
+    else:
+        drift_position = 0
+        drift_width = 1
+        stream_name = g._repr_content.get("Name")
+
+    stream_name = "{}_{}_{}_{}".format(
+        stream_id, stream_name, drift_position, drift_width
+    )
+    data = list(g.take(META_STREAM_SIZE))
+    pd_X = pd.DataFrame([data[i][0] for i in range(0, META_STREAM_SIZE)])
+    pd_y = pd.DataFrame([data[i][1] for i in range(0, META_STREAM_SIZE)])
+
+    if SET_GROUP == 1:
+        tsfel_cfg = {}
+        mfe_cfg = mfe_feature_list
+    if SET_GROUP == 2:
+        tsfel_cfg = None
+        mfe_cfg = []
+    if SET_GROUP == 3:
+        tsfel_cfg = None
+        mfe_cfg = mfe_feature_list
+
+    dict_mf = extract_meta_features(
+        pd_X,
+        pd_y,
+        summary_tsfel=["mean", "std"],
+        summary_mfe=["mean", "sd"],
+        tsfel_config=tsfel_cfg,
+        mfe_feature_config=mfe_cfg,
+    )
+
+    dict_mf[0]["stream_name"] = stream_name
+    return dict_mf
+
+
 if __name__ == "__main__":
     from train_generators import drifiting_streams, META_STREAM_SIZE
 
@@ -84,40 +152,12 @@ if __name__ == "__main__":
 
     collected_mf = []
 
-    for stream_id, g in tqdm(
-        enumerate(drifiting_streams), total=len(drifiting_streams)
-    ):
-        if isinstance(g, concept_drift.ConceptDriftStream):
-            drift_position = g.position
-            drift_width = g.width
-            stream_name = g.initialStream._repr_content.get("Name")
-
-        else:
-            drift_position = 0
-            drift_width = 1
-            stream_name = g._repr_content.get("Name")
-
-        stream_name = "{}_{}_{}_{}".format(
-            stream_id, stream_name, drift_position, drift_width
-        )
-        data = list(g.take(META_STREAM_SIZE))
-        pd_X = pd.DataFrame([data[i][0] for i in range(0, META_STREAM_SIZE)])
-        pd_y = pd.DataFrame([data[i][1] for i in range(0, META_STREAM_SIZE)])
-
-        dict_mf = extract_meta_features(
-            pd_X,
-            pd_y,
-            summary_tsfel=["mean", "std"],
-            summary_mfe=["mean", "sd"],
-            tsfel_config=None,
-            mfe_feature_config=mfe_feature_list,
-        )
-
-        dict_mf[0]["stream_name"] = stream_name
-        collected_mf += dict_mf
+    collected_mf = Parallel(n_jobs=N_JOBS)(
+        delayed(task)(i) for i in enumerate(drifiting_streams)
+    )
 
     pd_mf = pd.DataFrame(collected_mf)
     pd_mf.fillna(0, inplace=True)
     pd_mf.dropna(axis=1, how="all", inplace=True)
 
-    pd_mf.to_csv("training_meta_features_set_2.csv", index=None)
+    pd_mf.to_csv("{}".format(args.output), index=None)

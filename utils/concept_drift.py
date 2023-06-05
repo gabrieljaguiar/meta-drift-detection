@@ -90,10 +90,9 @@ class ConceptDriftStream(datasets.base.SyntheticDataset):
             self.initialStream.n_outputs,
         )
 
+    def __iter__(self):
         self.initialStreamIterator = iter(self.initialStream)
         self.nextStreamIterator = iter(self.nextStream)
-
-    def __iter__(self):
         while True:
             if self.instanceCount == self.size:
                 break
@@ -122,17 +121,15 @@ class ConceptDriftStream(datasets.base.SyntheticDataset):
         self.nextStreamIterator = iter(self.nextStream)
 
 
-"""
 if __name__ == "__main__":
     stream1 = synth.Agrawal(classification_function=0, seed=42)
     stream2 = synth.Agrawal(classification_function=8, seed=42)
 
     conceptDriftStream = ConceptDriftStream(
-        stream1, stream2, width=1, position=500, angle=0
+        stream1, stream2, width=1, position=500, angle=0, size=10000
     )
 
-    slicer = conceptDriftStream.take(506)
+    import pickle
 
-    for x, y in slicer:
-        print(x, y)
-"""
+    with open("f.obj", mode="wb") as f:
+        pickle.dump(conceptDriftStream, file=f)

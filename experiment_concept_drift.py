@@ -1,4 +1,5 @@
 from tqdm import tqdm
+from joblib import Parallel, delayed
 from utils import concept_drift
 from utils import adaptiveADWIN
 from utils.queue import Queue
@@ -63,6 +64,7 @@ print("OUTPUT FILE: {}".format(args.output))
 print("META-WINDOW: {}".format(META_WINDOW_SIZE))
 print("STRIDE_WINDOW: {}".format(STRIDE_WINDOW))
 print("EVALUATION_WINDOW: {}".format(EVALUATION_WINDOW))
+print("PARALLALEL JOBS: {}".format(N_JOBS))
 
 
 def find_nearest(array, value):
@@ -81,6 +83,7 @@ def print_class(c):
 def task(arg):
     global MODEL, META_WINDOW_SIZE, STRIDE_WINDOW, EVALUATION_WINDOW
     stream_id, g = arg
+    range_for_drift = 100
     if isinstance(g, concept_drift.ConceptDriftStream):
         drift_width = g.width
         stream_name = g.initialStream._repr_content.get("Name")
@@ -104,7 +107,7 @@ def task(arg):
             stream_id, stream_name, drift_position, drift_width
         )
 
-    print(stream_name)
+    print("Running {}...".format(stream_name))
 
     if MODEL == "META":
         X_queue = Queue(META_WINDOW_SIZE)
@@ -147,7 +150,7 @@ def task(arg):
         EVALUATION_WINDOW, g.n_classes if g.n_classes is not None else 2
     )
 
-    for i, (x, y) in tqdm(enumerate(g.take(META_STREAM_SIZE)), total=META_STREAM_SIZE):
+    for i, (x, y) in enumerate(g.take(META_STREAM_SIZE)):
         if (idx > (next_drift + range_for_drift)) and (next_drift > 0):
             next_drift_idx += 1
             try:
@@ -227,6 +230,8 @@ def task(arg):
         "fpr": false_positive,
     }
 
+    print("Finished {}...".format(stream_name))
+
     return item
 
 
@@ -290,21 +295,9 @@ if MODEL == "META":
     summary_mfe = ["mean", "sd"]
     tsfel_config = None
 
-range_for_drift = 100
 
-results = []
-
-from joblib import Parallel, delayed
-
-out = Parallel(n_jobs=2)(
-    delayed(print_class)(i) for i in enumerate(validation_drifting_streams)
+out = Parallel(n_jobs=N_JOBS)(
+    delayed(task)(i) for i in enumerate(validation_drifting_streams)
 )
 
-print(out)
-
-# with multiprocessing.pool.Pool(N_JOBS) as pool:
-#    for result in pool.imap(task, enumerate(agrawal_drifts)):
-#        results.append(results)
-
-# for stream_id, g in enumerate(validation_drifting_streams):
-#    results.append(task(g))
+pd.DataFrame(out).to_csv("{}".format(args.output), index=None)

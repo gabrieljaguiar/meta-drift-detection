@@ -173,10 +173,10 @@ stagger_drift = [
 
 
 validation_drifting_streams = (
-    # random_tree_no_drift
-    # random_tree_drift
-    # sea_no_drift
-    # sea_drift
-    # + stagger_no_drift
-    stagger_drift
+    random_tree_no_drift
+    + random_tree_drift
+    + sea_no_drift
+    + sea_drift
+    + stagger_no_drift
+    + stagger_drift
 )
