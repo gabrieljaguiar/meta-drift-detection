@@ -8,12 +8,101 @@ from train_generators import drifiting_streams, META_STREAM_SIZE
 import pandas as pd
 from tqdm import tqdm
 import os
+from joblib import Parallel, delayed
+import multiprocessing
 
 # formula avgdd = dd/number_of_detected_drifts #lower the better
 # detection_ratio = (fnr + fpr) / (tpr + 1) # lower the better
 # avgdd*10^detection_ratio #lower the better
 
+
 EVALUATION_WINDOW = 500
+
+N_JOBS = 2 if multiprocessing.cpu_count() <= 2 else multiprocessing.cpu_count()
+
+
+def task(arg):
+    stream_id, g = arg
+    model = naive_bayes.GaussianNB()
+    drift_detector = adwin.ADWIN(delta=delta_value)
+    idx = 0
+
+    if isinstance(g, concept_drift.ConceptDriftStream):
+        drift_position = g.position
+        drift_width = g.width
+        stream_name = g.initialStream._repr_content.get("Name")
+        stream_name = "{}_{}_{}_{}".format(
+            stream_id, stream_name, drift_position, drift_width
+        )
+        range_for_drift = max(range_for_drift, drift_width)
+        g.reset()
+    else:
+        drift_position = 0
+        drift_width = 1
+        stream_name = g._repr_content.get("Name")
+        stream_name = "{}_{}_{}_{}".format(
+            stream_id, stream_name, drift_position, drift_width
+        )
+
+    number_of_drifts_detected = 0
+    distance_to_drift = 0
+
+    true_positive = 0
+    false_positive = 0
+    false_negative = 0
+
+    for x, y in g.take(META_STREAM_SIZE):
+        y_hat = model.predict_proba_one(x)
+        y_predicted = model.predict_one(x)
+
+        # evaluator.addResult((x, y), y_hat)
+        model.learn_one(x, y)
+        if idx >= grace_period:
+            drift_detector.update(1 if y == y_predicted else 0)
+
+        if drift_detector.drift_detected:
+            distance_to_drift += abs(idx - drift_position)
+            number_of_drifts_detected += 1
+            if (
+                (drift_position > 0)
+                and (
+                    (idx <= drift_position + range_for_drift)
+                    and (idx >= drift_position - range_for_drift)
+                )
+                and true_positive == 0
+            ):
+                true_positive += 1
+            else:
+                false_positive += 1
+
+            idx += 1
+
+    if (drift_position > 0) and (true_positive == 0) and (false_positive == 0):
+        false_negative += 1
+        distance_to_drift = META_STREAM_SIZE
+
+    if (drift_position == 0) and (
+        (true_positive + false_positive + false_negative == 0)
+    ):  # There is no drift and no drift was detected
+        true_positive += 1
+
+    avg_dd = distance_to_drift / (true_positive + false_positive + false_negative)
+    detection_ratio = (false_negative + false_positive) / (true_positive + 1)
+    score = avg_dd * (10**detection_ratio)
+
+    item = {
+        "stream": stream_name,
+        "drift_position": drift_position,
+        "detection_delay": distance_to_drift,
+        "tpr": true_positive,
+        "fnr": false_negative,
+        "fpr": false_positive,
+        "delta_value": delta_value,
+        "score": score,
+    }
+
+    return item
+
 
 if not os.path.exists("meta_target.csv"):
     window_size = 500
@@ -53,101 +142,9 @@ if not os.path.exists("meta_target.csv"):
 
         stream_results = []
 
-        for stream_id, g in tqdm(
-            enumerate(drifiting_streams), total=len(drifiting_streams)
-        ):
-            # model = HoeffdingTreeClassifier()
-            model = naive_bayes.GaussianNB()
-            drift_detector = adwin.ADWIN(delta=delta_value)
-            idx = 0
-
-            if isinstance(g, concept_drift.ConceptDriftStream):
-                drift_position = g.position
-                drift_width = g.width
-                stream_name = g.initialStream._repr_content.get("Name")
-                stream_name = "{}_{}_{}_{}".format(
-                    stream_id, stream_name, drift_position, drift_width
-                )
-                range_for_drift = max(range_for_drift, drift_width)
-                g.reset()
-            else:
-                drift_position = 0
-                drift_width = 1
-                stream_name = g._repr_content.get("Name")
-                stream_name = "{}_{}_{}_{}".format(
-                    stream_id, stream_name, drift_position, drift_width
-                )
-
-            number_of_drifts_detected = 0
-            distance_to_drift = 0
-
-            true_positive = 0
-            false_positive = 0
-            false_negative = 0
-
-            stream_results = []
-            evaluator = Evaluator(EVALUATION_WINDOW, g.n_classes)
-
-            for x, y in g.take(META_STREAM_SIZE):
-                y_hat = model.predict_proba_one(x)
-                y_predicted = model.predict_one(x)
-
-                # evaluator.addResult((x, y), y_hat)
-                model.learn_one(x, y)
-                if idx >= grace_period:
-                    drift_detector.update(1 if y == y_predicted else 0)
-
-                if drift_detector.drift_detected:
-                    distance_to_drift += abs(idx - drift_position)
-                    number_of_drifts_detected += 1
-                    if (
-                        (drift_position > 0)
-                        and (
-                            (idx <= drift_position + range_for_drift)
-                            and (idx >= drift_position - range_for_drift)
-                        )
-                        and true_positive == 0
-                    ):
-                        true_positive += 1
-                    else:
-                        false_positive += 1
-
-                # if (idx + 1) % EVALUATION_WINDOW == 0:
-                #    eval_item = {"idx": idx, "accuracy": evaluator.getAccuracy()}
-                #    stream_results.append(eval_item)
-
-                idx += 1
-
-            # metrics_df = pd.DataFrame(stream_results)
-            # metrics_df.to_csv("./metrics/{}.csv".format(stream_name))
-
-            if (drift_position > 0) and (true_positive == 0) and (false_positive == 0):
-                false_negative += 1
-                distance_to_drift = META_STREAM_SIZE
-
-            if (drift_position == 0) and (
-                (true_positive + false_positive + false_negative == 0)
-            ):  # There is no drift and no drift was detected
-                true_positive += 1
-
-            avg_dd = distance_to_drift / (
-                true_positive + false_positive + false_negative
-            )
-            detection_ratio = (false_negative + false_positive) / (true_positive + 1)
-            score = avg_dd * (10**detection_ratio)
-
-            item = {
-                "stream": stream_name,
-                "drift_position": drift_position,
-                "detection_delay": distance_to_drift,
-                "tpr": true_positive,
-                "fnr": false_negative,
-                "fpr": false_positive,
-                "delta_value": delta_value,
-                "score": score,
-            }
-
-            meta_dataset.append(item)
+        meta_dataset = Parallel(n_jobs=N_JOBS)(
+            delayed(task)(i) for i in enumerate(drifiting_streams)
+        )
 
         df = pd.DataFrame(meta_dataset)
         df.to_csv("meta_target.csv", index=False)

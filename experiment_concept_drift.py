@@ -1,11 +1,8 @@
-from tqdm import tqdm
 from joblib import Parallel, delayed
 from utils import concept_drift
 from utils import adaptiveADWIN
 from utils.queue import Queue
 from utils.evaluator import Evaluator
-from river.tree import HoeffdingTreeClassifier
-from river.neighbors import KNNClassifier
 from river import naive_bayes
 from meta_features import extract_meta_features
 from sklearn.impute import SimpleImputer
@@ -73,11 +70,6 @@ def find_nearest(array, value):
     array = np.asarray(array)
     idx = (np.abs(array - value)).argmin()
     return array[idx]
-
-
-def print_class(c):
-    idx, classe = c
-    print(idx)
 
 
 def task(arg):
@@ -150,6 +142,8 @@ def task(arg):
         EVALUATION_WINDOW, g.n_classes if g.n_classes is not None else 2
     )
 
+    last_closest_drift = 0
+
     for i, (x, y) in enumerate(g.take(META_STREAM_SIZE)):
         if (idx > (next_drift + range_for_drift)) and (next_drift > 0):
             next_drift_idx += 1
@@ -205,9 +199,12 @@ def task(arg):
             if (closest_drift > 0) and (
                 (idx <= closest_drift + range_for_drift)
                 and (idx >= closest_drift - range_for_drift)
+                and (last_closest_drift != closest_drift)
             ):
                 concept_drift_detected = True
+                last_closest_drift = closest_drift
                 true_positive += 1
+
             else:
                 false_positive += 1
 
