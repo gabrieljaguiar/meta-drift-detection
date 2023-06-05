@@ -3,22 +3,15 @@ from utils import concept_drift
 import itertools
 import random
 
-META_STREAM_SIZE = 10000
+META_STREAM_SIZE = [2500, 5000, 10000]
 
 DRIFT_POSITIONS = [500, 1000, 1500]
 
 DRIFT_SPEED = [1, 150, 250, 350]
 
-DRIFT_POSITIONS = [2500, 5000, 7500]
+DRIFT_POSITIONS = [1 / 4, 1 / 2, 3 / 4]
 
 rng = random.Random(42)
-
-# TRAIN GENERATORS: AGRAWAL, Mixed, LED, Hyperplane, RandomRBF
-
-# TEST GENERATORS: RandomTree, SEA, Sine, STAGGER, Waveform
-
-# IN REAL-WORLD DATA STREAMS EVALUATE USING A CLASSIFIER THAT RELIES ON A CONCEPT DRIFT DETECTOR
-# REAL-WORLD DATASTREAMS: Elec2, CreditCard, Phishing, SMSSPAM, Insects, Spam Assassin, Chess
 
 
 agrawal_no_drifts = [
@@ -52,10 +45,12 @@ agrawal_drifts = [
         synth.Agrawal(classification_function=i[0], seed=(42), balance_classes=True),
         synth.Agrawal(classification_function=i[1], seed=(46), balance_classes=True),
         width=w,
-        position=j,
-        size=META_STREAM_SIZE,
+        position=int(size * j),
+        size=size,
     )
-    for i, j, w in list(itertools.product(variants, DRIFT_POSITIONS, DRIFT_SPEED))
+    for size, i, j, w, in list(
+        itertools.product(META_STREAM_SIZE, variants, DRIFT_POSITIONS, DRIFT_SPEED)
+    )
 ]
 
 mixed_drifts = [
@@ -63,10 +58,12 @@ mixed_drifts = [
         synth.Mixed(classification_function=0, seed=i),
         synth.Mixed(classification_function=1, seed=(i + 5)),
         width=w,
-        position=j,
-        size=META_STREAM_SIZE,
+        position=int(size * j),
+        size=size,
     )
-    for i, j, w in list(itertools.product(range(42, 46), DRIFT_POSITIONS, DRIFT_SPEED))
+    for size, i, j, w in list(
+        itertools.product(META_STREAM_SIZE, range(42, 46), DRIFT_POSITIONS, DRIFT_SPEED)
+    )
 ]
 
 mixed_drifts = mixed_drifts + [
@@ -74,10 +71,12 @@ mixed_drifts = mixed_drifts + [
         synth.Mixed(classification_function=1, seed=i),
         synth.Mixed(classification_function=0, seed=(i + 5)),
         width=w,
-        position=j,
-        size=META_STREAM_SIZE,
+        position=int(size * j),
+        size=size,
     )
-    for i, j, w in list(itertools.product(range(46, 50), DRIFT_POSITIONS, DRIFT_SPEED))
+    for size, i, j, w in list(
+        itertools.product(META_STREAM_SIZE, range(46, 50), DRIFT_POSITIONS, DRIFT_SPEED)
+    )
 ]
 
 
@@ -86,10 +85,12 @@ hyperplane_drifts = [
         synth.Hyperplane(seed=(42 + i), n_drift_features=(2 + i)),
         synth.Hyperplane(seed=(42 + i), n_drift_features=(2 + i + 1), mag_change=1.0),
         width=w,
-        position=j,
-        size=META_STREAM_SIZE,
+        position=int(size * j),
+        size=size,
     )
-    for i, j, w in list(itertools.product(range(0, 4), DRIFT_POSITIONS, DRIFT_SPEED))
+    for size, i, j, w in list(
+        itertools.product(META_STREAM_SIZE, range(0, 4), DRIFT_POSITIONS, DRIFT_SPEED)
+    )
 ]
 
 rbf_drift = [
@@ -97,11 +98,13 @@ rbf_drift = [
         synth.RandomRBF(seed_model=(42), n_centroids=i),
         synth.RandomRBF(seed_model=(48), n_centroids=i + base_value),
         width=w,
-        position=j,
-        size=META_STREAM_SIZE,
+        position=int(size * j),
+        size=size,
     )
-    for i, base_value, j, w in list(
-        itertools.product(range(2, 6), range(3, 6), DRIFT_POSITIONS, DRIFT_SPEED)
+    for size, i, base_value, j, w in list(
+        itertools.product(
+            META_STREAM_SIZE, range(2, 6), range(3, 6), DRIFT_POSITIONS, DRIFT_SPEED
+        )
     )
 ]
 

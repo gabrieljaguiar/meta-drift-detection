@@ -34,6 +34,7 @@ def task(arg):
         stream_name = "{}_{}_{}_{}".format(
             stream_id, stream_name, drift_position, drift_width
         )
+        sizes = [g.size]
         range_for_drift = max(range_for_drift, drift_width)
         g.reset()
     else:
@@ -43,6 +44,9 @@ def task(arg):
         stream_name = "{}_{}_{}_{}".format(
             stream_id, stream_name, drift_position, drift_width
         )
+        sizes = META_STREAM_SIZE
+    
+    for size in sizes:
 
     number_of_drifts_detected = 0
     distance_to_drift = 0

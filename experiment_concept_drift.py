@@ -73,7 +73,7 @@ def find_nearest(array, value):
 
 
 def task(arg):
-    global MODEL, META_WINDOW_SIZE, STRIDE_WINDOW, EVALUATION_WINDOW
+    global MODEL, META_WINDOW_SIZE, STRIDE_WINDOW, EVALUATION_WINDOW, tsfel_config, mfe_feature_list
     stream_id, g = arg
     range_for_drift = 100
     if isinstance(g, concept_drift.ConceptDriftStream):
@@ -279,6 +279,13 @@ if MODEL == "META":
         "kurtosis",
         "skewness",
         "sparsity",
+        "sd_ratio",
+        "class_ent",
+        "class_conc",
+        "class_ent",
+        "nr_cor_attr",
+        "c2",
+        "t4",
         "f1",
         "f1v",
         "f2",
@@ -290,7 +297,7 @@ if MODEL == "META":
 
     summary_tsfel = ["mean", "std"]
     summary_mfe = ["mean", "sd"]
-    tsfel_config = None
+    tsfel_config = {}
 
 
 out = Parallel(n_jobs=N_JOBS)(

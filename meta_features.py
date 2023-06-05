@@ -88,46 +88,54 @@ def extract_meta_features(
 def task(arg):
     global META_WINDOW_SIZE, SET_GROUP
     stream_id, g = arg
-    range_for_drift = 100
+    sizes = []
 
     if isinstance(g, concept_drift.ConceptDriftStream):
         drift_position = g.position
         drift_width = g.width
         stream_name = g.initialStream._repr_content.get("Name")
+        sizes = [g.size]
 
     else:
         drift_position = 0
         drift_width = 1
         stream_name = g._repr_content.get("Name")
+        sizes = META_STREAM_SIZE
 
-    stream_name = "{}_{}_{}_{}".format(
-        stream_id, stream_name, drift_position, drift_width
-    )
-    data = list(g.take(META_STREAM_SIZE))
-    pd_X = pd.DataFrame([data[i][0] for i in range(0, META_STREAM_SIZE)])
-    pd_y = pd.DataFrame([data[i][1] for i in range(0, META_STREAM_SIZE)])
+    meta_samples = []
 
-    if SET_GROUP == 1:
-        tsfel_cfg = {}
-        mfe_cfg = mfe_feature_list
-    if SET_GROUP == 2:
-        tsfel_cfg = None
-        mfe_cfg = []
-    if SET_GROUP == 3:
-        tsfel_cfg = None
-        mfe_cfg = mfe_feature_list
+    for size in sizes:
+        stream_name = "{}_{}_{}_{}_{}".format(
+            stream_id, stream_name, drift_position, drift_width, size
+        )
+        data = list(g.take(size))
+        pd_X = pd.DataFrame([data[i][0] for i in range(0, size)])
+        pd_y = pd.DataFrame([data[i][1] for i in range(0, size)])
 
-    dict_mf = extract_meta_features(
-        pd_X,
-        pd_y,
-        summary_tsfel=["mean", "std"],
-        summary_mfe=["mean", "sd"],
-        tsfel_config=tsfel_cfg,
-        mfe_feature_config=mfe_cfg,
-    )
+        if SET_GROUP == 1:
+            tsfel_cfg = {}
+            mfe_cfg = mfe_feature_list
+        if SET_GROUP == 2:
+            tsfel_cfg = None
+            mfe_cfg = []
+        if SET_GROUP == 3:
+            tsfel_cfg = None
+            mfe_cfg = mfe_feature_list
 
-    dict_mf[0]["stream_name"] = stream_name
-    return dict_mf
+        print("Extracting {}".format(stream_name))
+
+        dict_mf = extract_meta_features(
+            pd_X,
+            pd_y,
+            summary_tsfel=["mean", "std"],
+            summary_mfe=["mean", "sd"],
+            tsfel_config=tsfel_cfg,
+            mfe_feature_config=mfe_cfg,
+        )
+
+        dict_mf[0]["stream_name"] = stream_name
+        meta_samples.append(dict_mf)
+    return meta_samples
 
 
 if __name__ == "__main__":
@@ -141,6 +149,13 @@ if __name__ == "__main__":
         "kurtosis",
         "skewness",
         "sparsity",
+        "sd_ratio",
+        "class_ent",
+        "class_conc",
+        "class_ent",
+        "nr_cor_attr",
+        "c2",
+        "t4",
         "f1",
         "f1v",
         "f2",
