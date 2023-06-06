@@ -8,6 +8,7 @@ import warnings
 import argparse
 import tsfel
 import pandas as pd
+import itertools
 
 parser = argparse.ArgumentParser(description="Meta-feature extraction")
 
@@ -93,20 +94,20 @@ def task(arg):
     if isinstance(g, concept_drift.ConceptDriftStream):
         drift_position = g.position
         drift_width = g.width
-        stream_name = g.initialStream._repr_content.get("Name")
+        stream_identifier = g.initialStream._repr_content.get("Name")
         sizes = [g.size]
 
     else:
         drift_position = 0
         drift_width = 1
-        stream_name = g._repr_content.get("Name")
+        stream_identifier = g._repr_content.get("Name")
         sizes = META_STREAM_SIZE
 
     meta_samples = []
 
     for size in sizes:
         stream_name = "{}_{}_{}_{}_{}".format(
-            stream_id, stream_name, drift_position, drift_width, size
+            stream_id, stream_identifier, drift_position, drift_width, size
         )
         data = list(g.take(size))
         pd_X = pd.DataFrame([data[i][0] for i in range(0, size)])
@@ -170,6 +171,8 @@ if __name__ == "__main__":
     collected_mf = Parallel(n_jobs=N_JOBS)(
         delayed(task)(i) for i in enumerate(drifiting_streams)
     )
+
+    collected_mf = itertools.chain(*collected_mf)
 
     pd_mf = pd.DataFrame(collected_mf)
     pd_mf.fillna(0, inplace=True)
