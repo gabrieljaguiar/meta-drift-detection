@@ -24,7 +24,7 @@ EVALUATION_WINDOW = 500
 N_JOBS = 2 if multiprocessing.cpu_count() <= 2 else min(multiprocessing.cpu_count(), 48)
 
 
-def task(arg):
+def task(arg, delta_value):
     global range_for_drift
     stream_id, g = arg
 
@@ -159,7 +159,7 @@ if not os.path.exists("meta_target.csv"):
         print("Evaluating for delta = {}".format(delta_value))
 
         meta_df = Parallel(n_jobs=N_JOBS)(
-            delayed(task)(i) for i in enumerate(drifiting_streams)
+            delayed(task)(i, delta_value) for i in enumerate(drifiting_streams)
         )
 
         meta_df = itertools.chain.from_iterable(meta_df)
