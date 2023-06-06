@@ -135,7 +135,7 @@ def task(arg):
         )
 
         dict_mf[0]["stream_name"] = stream_name
-        meta_samples.append(dict_mf)
+        meta_samples.append(dict_mf[0])
     return meta_samples
 
 
@@ -172,7 +172,7 @@ if __name__ == "__main__":
         delayed(task)(i) for i in enumerate(drifiting_streams)
     )
 
-    collected_mf = itertools.chain(*collected_mf)
+    collected_mf = itertools.chain.from_iterable(collected_mf)
 
     pd_mf = pd.DataFrame(collected_mf)
     pd_mf.fillna(0, inplace=True)
