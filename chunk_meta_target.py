@@ -185,10 +185,45 @@ def task(arg, delta_value):
 
 META_STREAM_SIZE = 100000
 
-out = Parallel(n_jobs=N_JOBS)(
-    delayed(task)(i, 0.2) for i in enumerate(complex_drifts[70:])
-)
+possible_delta_values = [
+    (1 / i)
+    for i in [
+        2,
+        5,
+        8,
+        10,
+        20,
+        30,
+        40,
+        50,
+        100,
+        200,
+        300,
+        400,
+        500,
+        1000,
+        5000,
+        10000,
+        50000,
+        100000,
+        500000,
+        10000000,
+    ]
+]
 
-meta_df = itertools.chain.from_iterable(out)
+
+meta_dataset = []
+
+for delta_value in possible_delta_values:
+    out = Parallel(n_jobs=N_JOBS)(
+        delayed(task)(i, delta_value) for i in enumerate(complex_drifts)
+    )
+
+    meta_df = itertools.chain.from_iterable(out)
+    meta_dataset.append(meta_df)
+meta_dataset = itertools.chain.from_iterable(meta_dataset)
+
+df = pd.DataFrame(meta_dataset)
+df.to_csv("meta_target.csv", index=False)
 
 pd.DataFrame(meta_df).to_csv("{}".format(args.output), index=None)
