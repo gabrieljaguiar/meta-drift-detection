@@ -118,3 +118,144 @@ drifiting_streams = (
     + hyperplane_drifts
     + rbf_drift
 )
+
+
+agrawal_variants = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+comb = list(itertools.permutations(agrawal_variants, 5))
+variants = rng.sample(comb, 12)
+
+
+agrawal_drifts_complex = [
+    concept_drift.ConceptDriftStream(
+        synth.Agrawal(classification_function=i[0], seed=(42), balance_classes=True),
+        concept_drift.ConceptDriftStream(
+            synth.Agrawal(
+                classification_function=i[1], seed=(42), balance_classes=True
+            ),
+            concept_drift.ConceptDriftStream(
+                synth.Agrawal(
+                    classification_function=i[2], seed=(42), balance_classes=True
+                ),
+                concept_drift.ConceptDriftStream(
+                    synth.Agrawal(
+                        classification_function=i[3], seed=(42), balance_classes=True
+                    ),
+                    synth.Agrawal(
+                        classification_function=i[4], seed=(42), balance_classes=True
+                    ),
+                    position=20000,
+                    width=w,
+                    size=META_STREAM_SIZE,
+                ),
+                position=20000,
+                width=w,
+                size=META_STREAM_SIZE,
+            ),
+            position=20000,
+            width=w,
+            size=META_STREAM_SIZE,
+        ),
+        position=20000,
+        width=w,
+        size=META_STREAM_SIZE,
+    )
+    for i, w in list(itertools.product(variants, DRIFT_SPEED))
+]
+
+mixed_drifts_complex = [
+    concept_drift.ConceptDriftStream(
+        synth.Mixed(classification_function=1, seed=i),
+        concept_drift.ConceptDriftStream(
+            synth.Mixed(classification_function=0, seed=i + 5),
+            concept_drift.ConceptDriftStream(
+                synth.Mixed(classification_function=1, seed=i + 10),
+                concept_drift.ConceptDriftStream(
+                    synth.Mixed(classification_function=1, seed=i + 15),
+                    synth.Mixed(classification_function=0, seed=i + 20),
+                    position=20000,
+                    width=w,
+                    size=META_STREAM_SIZE,
+                ),
+                position=20000,
+                width=w,
+                size=META_STREAM_SIZE,
+            ),
+            position=20000,
+            width=w,
+            size=META_STREAM_SIZE,
+        ),
+        position=20000,
+        width=w,
+        size=META_STREAM_SIZE,
+    )
+    for i, w in list(itertools.product(range(46, 50), DRIFT_SPEED))
+]
+
+hyperplane_drifts_complex = [
+    concept_drift.ConceptDriftStream(
+        synth.Hyperplane(seed=(42 + i), n_drift_features=(2 + i)),
+        concept_drift.ConceptDriftStream(
+            synth.Hyperplane(seed=(42 + i), n_drift_features=(2 + i + 1)),
+            concept_drift.ConceptDriftStream(
+                synth.Hyperplane(seed=(42 + i), n_drift_features=(2 + i + 2)),
+                concept_drift.ConceptDriftStream(
+                    synth.Hyperplane(seed=(42 + i), n_drift_features=(2 + i + 3)),
+                    synth.Hyperplane(seed=(42 + i), n_drift_features=(2 + i + 4)),
+                    position=20000,
+                    width=w,
+                    size=META_STREAM_SIZE,
+                ),
+                position=20000,
+                width=w,
+                size=META_STREAM_SIZE,
+            ),
+            position=20000,
+            width=w,
+            size=META_STREAM_SIZE,
+        ),
+        position=20000,
+        width=w,
+        size=META_STREAM_SIZE,
+    )
+    for i, w in list(itertools.product(range(0, 4), DRIFT_SPEED))
+]
+
+
+rbf_drifts_complex = [
+    concept_drift.ConceptDriftStream(
+        synth.RandomRBF(seed_model=(42), n_centroids=i),
+        concept_drift.ConceptDriftStream(
+            synth.RandomRBF(seed_model=(48), n_centroids=i + base_value),
+            concept_drift.ConceptDriftStream(
+                synth.RandomRBF(seed_model=(48), n_centroids=i + base_value + 1),
+                concept_drift.ConceptDriftStream(
+                    synth.RandomRBF(seed_model=(48), n_centroids=i + base_value + 2),
+                    synth.RandomRBF(seed_model=(48), n_centroids=i + base_value + 3),
+                    position=20000,
+                    width=w,
+                    size=META_STREAM_SIZE,
+                ),
+                position=20000,
+                width=w,
+                size=META_STREAM_SIZE,
+            ),
+            position=20000,
+            width=w,
+            size=META_STREAM_SIZE,
+        ),
+        position=20000,
+        width=w,
+        size=META_STREAM_SIZE,
+    )
+    for i, base_value, w in list(
+        itertools.product(range(2, 6), range(3, 6), DRIFT_SPEED)
+    )
+]
+
+
+complex_drifts = (
+    agrawal_drifts_complex
+    + mixed_drifts_complex
+    + hyperplane_drifts_complex
+    + rbf_drifts_complex
+)

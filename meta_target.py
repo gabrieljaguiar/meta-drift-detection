@@ -87,7 +87,7 @@ def task(arg, delta_value):
                 else:
                     false_positive += 1
 
-                idx += 1
+            idx += 1
 
         if (drift_position > 0) and (true_positive == 0) and (false_positive == 0):
             false_negative += 1
