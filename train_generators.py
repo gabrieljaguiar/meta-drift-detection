@@ -255,7 +255,7 @@ rbf_drifts_complex = [
 
 complex_drifts = (
     agrawal_drifts_complex
-    + mixed_drifts_complex
-    + hyperplane_drifts_complex
-    + rbf_drifts_complex
+    # + mixed_drifts_complex
+    # + hyperplane_drifts_complex
+    # + rbf_drifts_complex
 )
