@@ -195,12 +195,20 @@ hyperplane_drifts_complex = [
     concept_drift.ConceptDriftStream(
         synth.Hyperplane(seed=(42 + i), n_drift_features=(2 + i)),
         concept_drift.ConceptDriftStream(
-            synth.Hyperplane(seed=(42 + i), n_drift_features=(2 + i + 1)),
+            synth.Hyperplane(
+                seed=(42 + i), n_drift_features=(2 + i + 1), mag_change=1.0
+            ),
             concept_drift.ConceptDriftStream(
-                synth.Hyperplane(seed=(42 + i), n_drift_features=(2 + i + 2)),
+                synth.Hyperplane(
+                    seed=(42 + i), n_drift_features=(2 + i + 2), mag_change=1.0
+                ),
                 concept_drift.ConceptDriftStream(
-                    synth.Hyperplane(seed=(42 + i), n_drift_features=(2 + i + 3)),
-                    synth.Hyperplane(seed=(42 + i), n_drift_features=(2 + i + 4)),
+                    synth.Hyperplane(
+                        seed=(42 + i), n_drift_features=(2 + i + 3), mag_change=1.0
+                    ),
+                    synth.Hyperplane(
+                        seed=(42 + i), n_drift_features=(2 + i + 4), mag_change=1.0
+                    ),
                     position=20000,
                     width=w,
                     size=META_STREAM_SIZE,
@@ -255,7 +263,7 @@ rbf_drifts_complex = [
 
 complex_drifts = (
     agrawal_drifts_complex
-    # + mixed_drifts_complex
-    # + hyperplane_drifts_complex
-    # + rbf_drifts_complex
+    + mixed_drifts_complex
+    + hyperplane_drifts_complex
+    + rbf_drifts_complex
 )

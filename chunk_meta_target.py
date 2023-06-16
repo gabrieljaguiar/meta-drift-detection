@@ -177,7 +177,7 @@ def task(arg, delta_value):
             else:
                 driftPosition = max(driftPosition - (idx - META_WINDOW_SIZE) - 1, 0)
 
-            if idx > 15000:
+            if idx > 0:
                 # print(
                 #    "Getting meta_data for chunck {} <-> {}".format(
                 #        idx - META_WINDOW_SIZE, idx
@@ -271,16 +271,20 @@ if DD_MODEL == "HDDM":
 if DD_MODEL == "KSWIN":
     possible_delta_values = [0.01, 0.008, 0.005, 0.002, 0.001]  # default baseline
 
-for delta_value in possible_delta_values:
-    out = Parallel(n_jobs=N_JOBS)(
-        delayed(task)(i, delta_value) for i in enumerate(complex_drifts[:12])
-    )
 
-    meta_df = itertools.chain.from_iterable(out)
-    meta_dataset.append(meta_df)
+out = Parallel(n_jobs=N_JOBS)(
+    delayed(task)(i, delta_value)
+    for i, delta_value in list(
+        itertools.product(enumerate(complex_drifts[:12]), possible_delta_values)
+    )
+)
+
+
+meta_df = itertools.chain.from_iterable(out)
+meta_dataset.append(meta_df)
+
 meta_dataset = itertools.chain.from_iterable(meta_dataset)
 
 df = pd.DataFrame(meta_dataset)
-# df.to_csv("meta_target.csv", index=False)
 
-pd.DataFrame(meta_dataset).to_csv("{}".format(args.output), index=None)
+df.to_csv("{}".format(args.output), index=None)
