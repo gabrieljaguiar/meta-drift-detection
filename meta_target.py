@@ -23,9 +23,11 @@ EVALUATION_WINDOW = 500
 
 N_JOBS = 2 if multiprocessing.cpu_count() <= 2 else min(multiprocessing.cpu_count(), 48)
 
+SAVE_METRICS = False
+
 
 def task(arg, delta_value):
-    global range_for_drift
+    global range_for_drift, META_STREAM_SIZE, EVALUATION_WINDOW, SAVE_METRICS
     stream_id, g = arg
 
     if isinstance(g, concept_drift.ConceptDriftStream):
@@ -47,12 +49,15 @@ def task(arg, delta_value):
 
     for size in sizes:
         model = naive_bayes.GaussianNB()
-        drift_detector = adwin.ADWIN(delta=delta_value)
+        # drift_detector = adwin.ADWIN(delta=delta_value)
+        drift_detector = binary.EDDM(alpha=delta_value, beta=delta_value)
 
         grace_period = int(size * 0.05)
         stream_name = "{}_{}_{}_{}_{}".format(
             stream_id, stream_identifier, drift_position, drift_width, size
         )
+
+        evaluator = Evaluator(500)
 
         print("Running {}...".format(stream_name))
 
@@ -64,13 +69,19 @@ def task(arg, delta_value):
         false_negative = 0
         idx = 0
 
+        eval_df = []
+
         for x, y in g.take(size):
             y_hat = model.predict_proba_one(x)
+            evaluator.addResult((x, y), y_hat)
             y_predicted = model.predict_one(x)
 
             model.learn_one(x, y)
             if idx >= grace_period:
                 drift_detector.update(1 if y == y_predicted else 0)
+
+            if (idx + 1) % EVALUATION_WINDOW == 0:
+                eval_df.append({"idx": idx, "accuracy": evaluator.getAccuracy()})
 
             if drift_detector.drift_detected:
                 distance_to_drift += abs(idx - drift_position)
@@ -88,6 +99,11 @@ def task(arg, delta_value):
                     false_positive += 1
 
             idx += 1
+
+        if SAVE_METRICS:
+            pd.DataFrame(eval_df).to_csv(
+                "./metrics/{}.csv".format(stream_name), index=None
+            )
 
         if (drift_position > 0) and (true_positive == 0) and (false_positive == 0):
             false_negative += 1
@@ -120,13 +136,13 @@ def task(arg, delta_value):
     return meta_samples
 
 
-if not os.path.exists("meta_target.csv"):
+if not os.path.exists("meta_target_2.csv"):
     window_size = 500
     idx = 0
     meta_dataset = []
 
     possible_delta_values = [
-        (1 / i)
+        1 / (1 + (1 / i))
         for i in [
             2,
             5,
@@ -166,10 +182,12 @@ if not os.path.exists("meta_target.csv"):
 
         meta_dataset.append(meta_df)
 
+        SAVE_METRICS = False
+
     meta_dataset = itertools.chain.from_iterable(meta_dataset)
 
     df = pd.DataFrame(meta_dataset)
-    df.to_csv("meta_target.csv", index=False)
+    df.to_csv("meta_target_eddm.csv", index=False)
 else:
     meta_target_df = pd.read_csv("meta_target.csv")
 

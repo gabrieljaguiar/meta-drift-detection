@@ -7,6 +7,9 @@ from river import naive_bayes
 from meta_features import extract_meta_features
 from sklearn.impute import SimpleImputer
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.pipeline import Pipeline
+from sklearn.svm import SVR
+from sklearn.preprocessing import StandardScaler
 from validation_generators import validation_drifting_streams, META_STREAM_SIZE
 
 import os
@@ -14,6 +17,7 @@ import pandas as pd
 import numpy as np
 import argparse
 import multiprocessing
+from tqdm import tqdm
 
 parser = argparse.ArgumentParser(description="Meta-Drift evaluation")
 
@@ -75,7 +79,7 @@ def find_nearest(array, value):
 def task(arg):
     global MODEL, META_WINDOW_SIZE, STRIDE_WINDOW, EVALUATION_WINDOW, tsfel_config, mfe_feature_list
     stream_id, g = arg
-    range_for_drift = 100
+    range_for_drift = 2000
     if isinstance(g, concept_drift.ConceptDriftStream):
         drift_width = g.width
         stream_name = g.initialStream._repr_content.get("Name")
@@ -144,7 +148,9 @@ def task(arg):
 
     last_closest_drift = 0
 
-    for i, (x, y) in enumerate(g.take(META_STREAM_SIZE)):
+    meta_features_extracted = []
+
+    for i, (x, y) in tqdm(enumerate(g.take(META_STREAM_SIZE))):
         if (idx > (next_drift + range_for_drift)) and (next_drift > 0):
             next_drift_idx += 1
             try:
@@ -182,6 +188,11 @@ def task(arg):
                 adwin_prediction = meta_model.predict(
                     meta_features_df.loc[:, feature_columns]
                 )
+
+                meta_features_df["adwin"] = adwin_prediction
+
+                meta_features_extracted.append(meta_features_df)
+
                 drift_detector.updateDelta(adwin_prediction)
 
         y_hat = model.predict_proba_one(x)
@@ -198,7 +209,7 @@ def task(arg):
             number_of_drifts_detected += 1
             if (closest_drift > 0) and (
                 (idx <= closest_drift + range_for_drift)
-                and (idx >= closest_drift - range_for_drift)
+                and (idx >= closest_drift - drift_width)
                 and (last_closest_drift != closest_drift)
             ):
                 concept_drift_detected = True
@@ -216,6 +227,10 @@ def task(arg):
     if args.save_metrics:
         metrics_df = pd.DataFrame(stream_results)
         metrics_df.to_csv("./metrics/{}.csv".format(stream_name))
+        meta_features_extracted_df = pd.concat(meta_features_extracted, axis=0)
+        meta_features_extracted_df.to_csv(
+            "./features/{}-{}.csv".format(META_WINDOW_SIZE, stream_name)
+        )
 
     item = {
         "stream": stream_name,
@@ -259,7 +274,7 @@ if MODEL == "META":
     idx_column = "stream"
     class_column = "delta_value"
 
-    meta_model = RandomForestRegressor(random_state=42)
+    meta_model = Pipeline([("scaler", StandardScaler()), ("rf", SVR())])
 
     feature_columns = meta_dataset.columns.difference([idx_column, class_column])
 

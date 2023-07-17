@@ -10,25 +10,12 @@ import tsfel
 import pandas as pd
 import itertools
 
-parser = argparse.ArgumentParser(description="Meta-feature extraction")
-
-parser.add_argument(
-    "--output", type=str, help="output file", default="meta_features.csv"
-)
-
-parser.add_argument(
-    "--feature-set",
-    type=int,
-    help="Set of features to be used. 1 = MFE, 2 = TSFEL, 3 = BOTH",
-    default=1,
-)
-
-parser.add_argument("--n-jobs", type=int, default=-1, help="Number of multiple process")
-
-args = parser.parse_args()
-
-N_JOBS = args.n_jobs
-SET_GROUP = args.feature_set
+IMBALANCE_SCENARIO = imbalance_ratios = {
+    "0.5_0.5_0.5_0.5_0.5": "STABLE",
+    "0.8_0.4_0.3_0.2_0.1": "DECREASING",
+    "0.8_0.2_0.8_0.2_0.8": "FLIPPING",
+    "0.5_0.25_0.1_0.25_0.5": "INCREASE_DECREASE",
+}
 
 
 def extract_meta_features(
@@ -43,6 +30,7 @@ def extract_meta_features(
         domain = tsfel.get_features_by_domain()
         cfg = {}
         cfg["temporal"] = domain.get("temporal")
+        cfg["statistical"] = domain.get("statistical")
     else:
         cfg = tsfel_config
 
@@ -92,55 +80,98 @@ def task(arg):
     sizes = []
 
     if isinstance(g, concept_drift.ConceptDriftStream):
-        drift_position = g.position
+        # print("here")
         drift_width = g.width
-        stream_identifier = g.initialStream._repr_content.get("Name")
-        sizes = [g.size]
+        # print(g.initialStream)
+        stream_name = g.initialStream.generator.__class__.__name__
 
-    else:
+        drift_positions = []
         drift_position = 0
-        drift_width = 1
-        stream_identifier = g._repr_content.get("Name")
-        sizes = META_STREAM_SIZE
+        next_stream = g
+        size = g.size
+
+        imb_scenario = ""
+        imb_scenario = "{}".format(next_stream.initialStream.getImbalance())
+
+        while isinstance(next_stream, concept_drift.ConceptDriftStream):
+            drift_position += g.position
+
+            drift_positions.append(drift_position)
+            next_stream = next_stream.nextStream
+            if isinstance(next_stream, concept_drift.ConceptDriftStream):
+                imb_scenario = "{}_{}".format(
+                    imb_scenario, next_stream.initialStream.getImbalance()
+                )
+            else:
+                imb_scenario = "{}_{}".format(imb_scenario, next_stream.getImbalance())
+        imb_scenario = IMBALANCE_SCENARIO.get(imb_scenario)
+        stream_name = "{}_{}_{}_{}_{}".format(
+            stream_id, stream_name, imb_scenario, size, drift_width
+        )
+        g.reset()
+    else:
+        size = g.size
+        drift_positions = [size / 2]
+        stream_name = g._repr_content.get("Name")
 
     meta_samples = []
 
-    for size in sizes:
-        stream_name = "{}_{}_{}_{}_{}".format(
-            stream_id, stream_identifier, drift_position, drift_width, size
-        )
-        data = list(g.take(size))
-        pd_X = pd.DataFrame([data[i][0] for i in range(0, size)])
-        pd_y = pd.DataFrame([data[i][1] for i in range(0, size)])
+    data = list(g.take(size))
+    pd_X = pd.DataFrame([data[i][0] for i in range(0, size)])
+    pd_y = pd.DataFrame([data[i][1] for i in range(0, size)])
 
-        if SET_GROUP == 1:
-            tsfel_cfg = {}
-            mfe_cfg = mfe_feature_list
-        if SET_GROUP == 2:
-            tsfel_cfg = None
-            mfe_cfg = []
-        if SET_GROUP == 3:
-            tsfel_cfg = None
-            mfe_cfg = mfe_feature_list
+    if SET_GROUP == 1:
+        tsfel_cfg = {}
+        mfe_cfg = mfe_feature_list
+    if SET_GROUP == 2:
+        tsfel_cfg = None
+        mfe_cfg = []
+    if SET_GROUP == 3:
+        tsfel_cfg = None
+        mfe_cfg = mfe_feature_list
 
-        print("Extracting {}".format(stream_name))
+    print("Extracting {}".format(stream_name))
 
-        dict_mf = extract_meta_features(
-            pd_X,
-            pd_y,
-            summary_tsfel=["mean", "std"],
-            summary_mfe=["mean", "sd"],
-            tsfel_config=tsfel_cfg,
-            mfe_feature_config=mfe_cfg,
-        )
+    dict_mf = extract_meta_features(
+        pd_X,
+        pd_y,
+        summary_tsfel=["mean", "max", "min"],
+        summary_mfe=["mean", "sd"],
+        tsfel_config=tsfel_cfg,
+        mfe_feature_config=mfe_cfg,
+    )
 
-        dict_mf[0]["stream_name"] = stream_name
-        meta_samples.append(dict_mf[0])
+    dict_mf[0]["stream_name"] = stream_name
+    meta_samples.append(dict_mf[0])
     return meta_samples
 
 
 if __name__ == "__main__":
     from train_generators import drifiting_streams, META_STREAM_SIZE
+
+    from meta_data_generators import meta_data_streams
+
+    parser = argparse.ArgumentParser(description="Meta-feature extraction")
+
+    parser.add_argument(
+        "--output", type=str, help="output file", default="meta_features.csv"
+    )
+
+    parser.add_argument(
+        "--feature-set",
+        type=int,
+        help="Set of features to be used. 1 = MFE, 2 = TSFEL, 3 = BOTH",
+        default=1,
+    )
+
+    parser.add_argument(
+        "--n-jobs", type=int, default=-1, help="Number of multiple process"
+    )
+
+    args = parser.parse_args()
+
+    N_JOBS = args.n_jobs
+    SET_GROUP = args.feature_set
 
     mfe_feature_list = [
         "joint_ent",
@@ -169,10 +200,10 @@ if __name__ == "__main__":
     collected_mf = []
 
     collected_mf = Parallel(n_jobs=N_JOBS)(
-        delayed(task)(i) for i in enumerate(drifiting_streams)
+        delayed(task)(i) for i in enumerate(meta_data_streams)
     )
 
-    collected_mf = itertools.chain.from_iterable(collected_mf)
+    collected_mf = list(itertools.chain.from_iterable(collected_mf))
 
     pd_mf = pd.DataFrame(collected_mf)
     pd_mf.fillna(0, inplace=True)
