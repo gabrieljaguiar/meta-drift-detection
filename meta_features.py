@@ -147,8 +147,6 @@ def task(arg):
 
 
 if __name__ == "__main__":
-    from train_generators import drifiting_streams, META_STREAM_SIZE
-
     from meta_data_generators import meta_data_streams
 
     parser = argparse.ArgumentParser(description="Meta-feature extraction")

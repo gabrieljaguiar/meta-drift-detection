@@ -1,24 +1,17 @@
 from joblib import Parallel, delayed
 from utils import concept_drift
-from utils import adaptiveADWIN
 from utils.queue import Queue
 from utils.evaluator import Evaluator
-from river import naive_bayes
 from meta_features import extract_meta_features
-from sklearn.impute import SimpleImputer
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.pipeline import Pipeline
-from sklearn.svm import SVR, SVC, LinearSVC, LinearSVR
 from sklearn.preprocessing import StandardScaler
 from river.drift import KSWIN, adwin, binary
 from river.tree import HoeffdingAdaptiveTreeClassifier
 
-import os
 import pandas as pd
-import numpy as np
 import argparse
 import multiprocessing
-from tqdm import tqdm
 import random
 
 parser = argparse.ArgumentParser(description="Meta-Drift evaluation")
@@ -371,9 +364,6 @@ if __name__ == "__main__":
     feature_importance["adwin"] = meta_model_adwin["rf"].feature_importances_
     feature_importance["ddm"] = meta_model_ddm["rf"].feature_importances_
     feature_importance["hddm"] = meta_model_hddm["rf"].feature_importances_
-
-    feature_importance.to_csv("feature_importance.csv", index=None)
-    exit(0)
 
     out = Parallel(n_jobs=N_JOBS)(
         delayed(task)(i) for i in list(enumerate(validation_drifting_streams))

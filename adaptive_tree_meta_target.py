@@ -1,24 +1,18 @@
 import argparse
 import itertools
 import multiprocessing
-import os
-import sys
 
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
-from river import naive_bayes
-from river.datasets import synth
 from river.drift import KSWIN, adwin, binary
-from river.neighbors import KNNClassifier
 from river.tree import HoeffdingAdaptiveTreeClassifier
-from tqdm import tqdm
+from validation_generators import validation_drifting_streams
 
-from train_generators import complex_drifts, drifiting_streams
-from utils import adaptiveADWIN, concept_drift
+from utils import concept_drift
 from utils.evaluator import Evaluator
 from utils.queue import Queue
-from validation_generators import validation_drifting_streams
+
 
 parser = argparse.ArgumentParser(description="Meta-Drift target")
 
@@ -106,50 +100,6 @@ def getMetaData(chunk, delta_value):
     return metrics
 
 
-def task_real_world(
-    arg,
-):
-    global META_WINDOW_SIZE, META_STREAM_SIZE, STRIDE_WINDOW
-    _, (stream_name, g) = arg
-    g = iter_arff(g)
-    print(stream_name)
-    meta_target_df = []
-
-    print("Evaluating {} with {}".format(stream_name, DD_MODEL))
-
-    X_list = []
-    y_list = []
-
-    for x, y in g:
-        if y is None:
-            y = x.pop(list(x.keys())[-1])
-        X_list.append(x)
-        y_list.append(y)
-
-    X_queue = Queue(10)
-    y_queue = Queue(10)
-
-    X_queue.setQueue(X_list)
-    y_queue.setQueue(y_list)
-
-    metrics = getMetaData((X_queue, y_queue), 1)
-
-    metrics_df = pd.DataFrame(metrics)
-
-    item = {
-        "stream": stream_name,
-        "acc": metrics_df["acc"].mean(),
-    }
-
-    metrics_df.to_csv("./metrics/{}_{}.csv".format(DD_MODEL, stream_name))
-
-    meta_target_df.append(item)
-
-    print("Finished evaluating {} with {}".format(stream_name, DD_MODEL))
-
-    return meta_target_df
-
-
 def task(arg, delta_value):
     global META_WINDOW_SIZE, META_STREAM_SIZE, STRIDE_WINDOW, IMBALANCE_SCENARIO
     stream_id, g = arg
@@ -189,11 +139,6 @@ def task(arg, delta_value):
         drift_positions = [size / 2]
         stream_name = g._repr_content.get("Name")
 
-    number_of_drifts_detected = 0
-    distance_to_drift = 0
-
-    # print(drift_positions)
-
     idx = 0
 
     stride = 0
@@ -208,18 +153,12 @@ def task(arg, delta_value):
         "Evaluating {} with {} for delta {}".format(stream_name, DD_MODEL, delta_value)
     )
 
-    # size = min(100000, g.n_samples)
-    # META_WINDOW_SIZE = min(100000, g.n_samples)
-
     META_WINDOW_SIZE = size
 
     X_queue = Queue(META_WINDOW_SIZE)
     y_queue = Queue(META_WINDOW_SIZE)
 
-    # model = naive_bayes.GaussianNB()
-
     for i, (x, y) in enumerate(g.take(size)):
-        # print(i)
         X_queue.insert(x)
         y_queue.insert(y)
         stride += 1
@@ -265,44 +204,12 @@ def task(arg, delta_value):
         )
     )
 
-    # print(meta_target_df)
-
     return meta_target_df
 
 
-# META_STREAM_SIZE = 100000
-
 meta_dataset = []
-
-if DD_MODEL == "ADWIN":
-    possible_delta_values = [0.01, 0.008, 0.005, 0.002, 0.001]  # default baseline
-    # possible_delta_values = [3, 4, 5, 6, 7, 8, 9]
-if DD_MODEL == "KSWIN":
-    possible_delta_values = [0.01, 0.008, 0.005, 0.002, 0.001]  # default baseline
-
 possible_delta_values = [1]
 
-if EVALUATION:
-    from validation_generators import validation_drifting_streams
-    from glob import glob
-    from river.stream import iter_arff
-
-    datasets = glob("./datasets/*.arff")
-
-    complex_drifts = [(os.path.basename(ds), ds) for ds in datasets]
-
-    # complex_drifts = [("agrwal", validation_drifting_streams[1])]
-
-    out = Parallel(n_jobs=N_JOBS)(
-        delayed(task_real_world)(i) for i in enumerate(complex_drifts)
-    )
-
-    exit(0)
-
-# from validation_generators import validation_drifting_streams
-
-from meta_data_generators import meta_data_streams
-from validation_generators import validation_drifting_streams
 
 out = Parallel(n_jobs=N_JOBS)(
     delayed(task)(i, delta_value)
@@ -310,7 +217,6 @@ out = Parallel(n_jobs=N_JOBS)(
         itertools.product(enumerate(validation_drifting_streams), possible_delta_values)
     )
 )
-
 
 meta_df = itertools.chain.from_iterable(out)
 meta_dataset.append(meta_df)

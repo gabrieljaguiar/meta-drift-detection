@@ -1,18 +1,13 @@
 from joblib import Parallel, delayed
-from utils import concept_drift
-from utils import adaptiveADWIN
 from utils.queue import Queue
 from utils.evaluator import Evaluator
-from river import naive_bayes
 from meta_features import extract_meta_features
 from sklearn.impute import SimpleImputer
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.pipeline import Pipeline
-from sklearn.svm import SVR, SVC, LinearSVC, LinearSVR
 from sklearn.preprocessing import StandardScaler
 from river.drift import KSWIN, adwin, binary
 from river.tree import HoeffdingAdaptiveTreeClassifier
-from river.stream import iter_arff
 import os
 import pandas as pd
 import numpy as np
@@ -298,10 +293,18 @@ if __name__ == "__main__":
         idx_column = "stream"
         class_column = "rank"
 
-        meta_model_hddm = Pipeline([("scaler", StandardScaler()), ("rf", SVR())])
-        meta_model_ddm = Pipeline([("scaler", StandardScaler()), ("rf", SVR())])
-        meta_model_adwin = Pipeline([("scaler", StandardScaler()), ("rf", SVR())])
-        meta_model_kswin = Pipeline([("scaler", StandardScaler()), ("rf", SVR())])
+        meta_model_hddm = Pipeline(
+            [("scaler", StandardScaler()), ("rf", RandomForestRegressor())]
+        )
+        meta_model_ddm = Pipeline(
+            [("scaler", StandardScaler()), ("rf", RandomForestRegressor())]
+        )
+        meta_model_adwin = Pipeline(
+            [("scaler", StandardScaler()), ("rf", RandomForestRegressor())]
+        )
+        meta_model_kswin = Pipeline(
+            [("scaler", StandardScaler()), ("rf", RandomForestRegressor())]
+        )
         # meta_model = DecisionTreeClassifier()
 
         meta_dataset.drop(["stream_name", "model"], axis=1, inplace=True)
