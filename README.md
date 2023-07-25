@@ -1,13 +1,4 @@
-# meta-drift-detection
+# Enhancing Concept Drift Detection in Drifting and Imbalanced Data Streams through Meta-Learning
 
 
-Step by step
-
-
-1. define generators with concept drift. (sudden, gradual and incremental)
-2. define meta-features.
-3. define the window which meta-features are going to be extracted.
-4. define how the best adwin sensitivity value is going to be selected.
-5. train a RF or SVM on meta-dataset.
-6. start a stream with a classifier that depends on adwin and compare the performance with meta-adjusted with default parameters.
-    6.1. predictive performance + performance of drift detection (number of instances before drift is detected)
+Learning from data streams is among the most important research topics in contemporary Machine Learning. One of the biggest challenges in this domain relies on proposing algorithms that can adapt to new arriving data. However, due to the evolving nature of data streams, they are subject to a phenomenon known as concept drift that makes previously learned knowledge outdated and must be efficiently detected in order to efficiently adapt the learning model. While there exists a plethora of drift detectors, with different mechanisms, selecting the most suitable for a new stream is a difficult task, since apriori knowledge may not be available and changes over time can affect the efficiency of the detector.  With this in mind, we propose a framework that exploits statistical and temporal meta-features from sliding windows to recommend a suitable drift detector for new unseen data using Meta-Learning. We performed experiments on 10 real-world data streams and 18 synthetic generated data streams that were subject to concept drift and class imbalance in order to evaluate the performance of the proposed framework. Experiments exposed that the proposed approach was able to enhance the concept drift detection in a variety of scenarios demonstrating robustness to class imbalance and highlighting the importance of dynamically select the drift detector.
